@@ -2073,8 +2073,7 @@
             <!-- Quick Actions -->
             <div style="padding:8px 0 0">
                 <div style="padding:0 16px 8px;display:flex;justify-content:space-between;align-items:center">
-                    <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem;color:var(--navy)">Quick
-                        Actions</span>
+                    <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem;color:var(--navy)">Quick Actions</span>
                 </div>
                 <div class="quick-actions">
                     <div class="quick-action" onclick="switchTab('rides')">
@@ -2096,12 +2095,19 @@
                 </div>
             </div>
 
+            <!-- Install App Banner -->
+            <div id="install-pwa-banner" class="stat-card" style="margin: 16px; background: rgba(0, 80, 255, 0.05); border-color: rgba(0, 80, 255, 0.2); display: none; align-items: center; justify-content: space-between;">
+                <div>
+                    <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;color:var(--navy)">Install App</div>
+                    <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:2px">For the best experience</div>
+                </div>
+                <button id="btn-install-pwa" class="btn-primary" style="margin:0; width: auto; padding: 10px 20px; font-size: 0.85rem">Install</button>
+            </div>
+
             <!-- Recent Rides -->
             <div style="padding:0 16px 8px;display:flex;justify-content:space-between;align-items:center">
-                <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem;color:var(--navy)">Recent
-                    Activity</span>
-                <span style="font-size:.78rem;color:var(--accent);cursor:pointer" onclick="switchTab('rides')">See
-                    all</span>
+                <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem;color:var(--navy)">Recent Activity</span>
+                <span style="font-size:.78rem;color:var(--accent);cursor:pointer" onclick="switchTab('rides')">See all</span>
             </div>
             <div id="home-recent-rides">
                 <div class="skeleton" style="height:90px;margin:0 16px 10px;"></div>
@@ -2614,6 +2620,52 @@
                     switchTab('home', false);
                 }
             });
+
+            // PWA Logic
+            initPWAInstall();
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // PWA INSTALLATION
+        // ═══════════════════════════════════════════════════════════════
+        let deferredPrompt = null;
+        function isPWAInstalled() {
+            return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || document.referrer.includes('android-app://');
+        }
+        function initPWAInstall() {
+            const banner = document.getElementById('install-pwa-banner');
+            const btnInstall = document.getElementById('btn-install-pwa');
+
+            // If uninstalled, localstorage key will remain but display-mode won't match standalone.
+            if (!isPWAInstalled()) {
+                banner.style.display = 'flex';
+            }
+
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                if (!isPWAInstalled()) {
+                    banner.style.display = 'flex';
+                }
+            });
+
+            window.addEventListener('appinstalled', () => {
+                banner.style.display = 'none';
+                deferredPrompt = null;
+                showToastMsg('✅ Safarr Driver installed!');
+            });
+
+            btnInstall.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    deferredPrompt = null;
+                }
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+                if (isIOS && !window.navigator.standalone) {
+                    showToastMsg('Tap Share ⬆ then "Add to Home Screen"');
+                }
+            });
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -2860,6 +2912,7 @@
                 if (APP.driverData?.id) {
                     _supabase.from('auto_drivers').update({ is_online: true }).eq('id', APP.driverData.id).then();
                 }
+                enablePushNotifications();
             } else {
                 tog.classList.remove('active');
                 lbl.textContent = t('go_online');
@@ -3306,10 +3359,35 @@
         // PUSH NOTIFICATION REQUEST
         // ═══════════════════════════════════════════════════════════════
         async function requestPushPermission() {
-            if ('Notification' in window && Notification.permission === 'default') {
+            if (!('serviceWorker' in navigator) || !window.PushManager) return;
+            if (Notification.permission === 'default') {
                 const perm = await Notification.requestPermission();
                 if (perm === 'granted') showToastMsg('🔔 Notifications enabled!');
             }
+            if (Notification.permission === 'granted') {
+                try {
+                    const reg = await navigator.serviceWorker.ready;
+                    const sub = await reg.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlB64ToUint8Array('BPk13h06zakSh4-5vSFnt__Wsf4k0gGB6-_qtyw0ceKG4YATLxRz_M7_rBBuwDkfbWQUoJjQFlFNXsiQyFGytDY')
+                    });
+                    
+                    if(APP.driverData && APP.driverData.id) {
+                        await _supabase.from('auto_drivers').update({ push_sub: JSON.stringify(sub) }).eq('id', APP.driverData.id).then();
+                    }
+                } catch (err) {
+                    console.error('Push sub error:', err);
+                }
+            }
+        }
+
+        function urlB64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) { outputArray[i] = rawData.charCodeAt(i); }
+            return outputArray;
         }
 
         // Request push permission after page loads

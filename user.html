@@ -225,6 +225,16 @@
         <div class="content">
             <!-- TAB: HOME / BOOK -->
             <div class="tab-content active" id="tab-home">
+            
+                <!-- Install App Banner -->
+                <div id="install-pwa-banner" class="ride-card" style="margin-bottom: 24px; padding: 16px; background: rgba(0, 80, 255, 0.05); border-color: rgba(0, 80, 255, 0.2); display: none; align-items: center; justify-content: space-between;">
+                    <div>
+                        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;color:var(--navy)">Install App</div>
+                        <div style="font-size:0.8rem;color:var(--gray);margin-top:2px">For the best experience</div>
+                    </div>
+                    <button id="btn-install-pwa" class="btn-auth" style="margin:0; width: auto; padding: 10px 20px; font-size: 0.85rem">Install</button>
+                </div>
+
                 <div class="ride-card">
                     <div class="ride-title">📍 Book a Ride</div>
                     <div class="location-group">
@@ -290,6 +300,10 @@
 
                 <div class="prof-card">
                     <div class="prof-row">
+                        <span class="prof-lbl">Address</span>
+                        <span class="prof-val" id="prof-addr">—</span>
+                    </div>
+                    <div class="prof-row">
                         <span class="prof-lbl">Mobile</span>
                         <span class="prof-val" id="prof-mobile">—</span>
                     </div>
@@ -297,11 +311,8 @@
                         <span class="prof-lbl">Email</span>
                         <span class="prof-val" id="prof-email">Not set</span>
                     </div>
-                    <div class="prof-row">
-                        <span class="prof-lbl">Joined</span>
-                        <span class="prof-val">April 2024</span>
-                    </div>
                 </div>
+                <button class="btn-auth" style="background:var(--gray-light); color:var(--navy); margin-bottom: 12px" onclick="showEditProfile()">Edit Profile</button>
                 <button class="btn-auth" style="background:var(--danger-soft); color:var(--danger)" onclick="logout()">Logout</button>
             </div>
 
@@ -335,6 +346,21 @@
                 <span class="tab-label">Help</span>
             </button>
         </nav>
+    </div>
+
+    <!-- Edit Profile Modal -->
+    <div class="screen" id="modal-edit-profile" style="z-index: 1000; background: rgba(0,0,0,0.5); justify-content: flex-end; backdrop-filter: blur(4px);">
+        <div style="background: var(--white); padding: 24px; border-radius: 24px 24px 0 0; padding-bottom: 100px; animation: slideUp 0.3s ease;">
+            <style>@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}</style>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 24px;">
+                <h3 style="font-family:'Syne', sans-serif;">Edit Profile</h3>
+                <span style="font-size: 1.5rem; cursor: pointer; background: var(--gray-light); width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%;" onclick="hideEditProfile()">×</span>
+            </div>
+            <div class="form-group"><label class="label">Name</label><input type="text" class="input" id="ep-name"></div>
+            <div class="form-group"><label class="label">Email</label><input type="email" class="input" id="ep-email"></div>
+            <div class="form-group"><label class="label">Address</label><textarea class="input" id="ep-addr"></textarea></div>
+            <button class="btn-auth" onclick="saveProfile()">Save Changes</button>
+        </div>
     </div>
 
     <script>
@@ -441,7 +467,6 @@
             subscribeToRideUpdates();
         }
 
-        // ─── BOOKING ───────────────────────────────────────────────
         async function bookRide() {
             const from = document.getElementById('inp-from').value.trim();
             const to = document.getElementById('inp-to').value.trim();
@@ -466,6 +491,32 @@
 
             APP.pendingRide = data;
             showToast('Searching for nearby Autos... 🔍');
+            
+            // Trigger web push to drivers
+            triggerDriverNotification(ridePayload);
+        }
+        
+        async function triggerDriverNotification(ride) {
+            try {
+                // Fetch online drivers who have a push subscription
+                const { data: drivers } = await _supabase.from('auto_drivers').select('push_sub').eq('is_online', true).not('push_sub', 'is', null);
+                
+                if (drivers && drivers.length > 0) {
+                    const subscriptions = drivers.map(d => JSON.parse(d.push_sub));
+                    const payload = {
+                        title: 'Safarr: New Ride Request!',
+                        body: `${ride.pickup_address} ➔ ${ride.dropoff_address}`
+                    };
+
+                    await fetch('/.netlify/functions/notify-drivers', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ subscriptions, payload })
+                    });
+                }
+            } catch(e) {
+                console.error('Failed to notify drivers', e);
+            }
         }
 
         function subscribeToRideUpdates() {
@@ -500,6 +551,34 @@
             document.getElementById('app-user-name').textContent = 'Hello, ' + (APP.user.full_name.split(' ')[0]);
             document.getElementById('prof-mobile').textContent = APP.user.mobile;
             document.getElementById('prof-email').textContent = APP.user.email || 'Not set';
+            document.getElementById('prof-addr').textContent = APP.user.address || 'Not set';
+        }
+
+        function showEditProfile() {
+            document.getElementById('ep-name').value = APP.user.full_name || '';
+            document.getElementById('ep-email').value = APP.user.email || '';
+            document.getElementById('ep-addr').value = APP.user.address || '';
+            document.getElementById('modal-edit-profile').style.display = 'flex';
+        }
+        function hideEditProfile() {
+            document.getElementById('modal-edit-profile').style.display = 'none';
+        }
+        async function saveProfile() {
+            const updates = {
+                full_name: document.getElementById('ep-name').value,
+                email: document.getElementById('ep-email').value,
+                address: document.getElementById('ep-addr').value
+            };
+            setLoading(true);
+            const { error } = await _supabase.from('safarr_users').update(updates).eq('id', APP.user.id);
+            setLoading(false);
+            if (!error) {
+                APP.user = { ...APP.user, ...updates };
+                localStorage.setItem('sf_user', JSON.stringify(APP.user));
+                populateProfile();
+                hideEditProfile();
+                showToast('Profile updated!');
+            }
         }
 
         async function loadRideHistory() {
@@ -550,6 +629,44 @@
             document.getElementById('ob-step-title').textContent = n === 2 ? 'Emergency Contacts' : 'Personal Details';
             document.getElementById('ob-step-desc').textContent = n === 2 ? 'Who should we contact in emergency?' : 'Complete your profile to book rides';
         }
+
+        // ═══════════════════════════════════════════════════════════════
+        // PWA INSTALLATION
+        // ═══════════════════════════════════════════════════════════════
+        let deferredPrompt = null;
+        function isPWAInstalled() {
+            return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || document.referrer.includes('android-app://');
+        }
+        window.addEventListener('DOMContentLoaded', () => {
+            const banner = document.getElementById('install-pwa-banner');
+            const btnInstall = document.getElementById('btn-install-pwa');
+
+            if (!isPWAInstalled()) banner.style.display = 'flex';
+
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                if (!isPWAInstalled()) banner.style.display = 'flex';
+            });
+
+            window.addEventListener('appinstalled', () => {
+                banner.style.display = 'none';
+                deferredPrompt = null;
+                showToast('✅ Safarr installed!');
+            });
+
+            btnInstall.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    deferredPrompt = null;
+                }
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+                if (isIOS && !window.navigator.standalone) {
+                    showToast('Tap Share ⬆ then "Add to Home Screen"');
+                }
+            });
+        });
     </script>
 </body>
 </html>
