@@ -3054,6 +3054,12 @@
                 renderHomeRides();
                 updateRideBadge();
                 updateTodayStats();
+
+                // Show alert if there is an active pending ride and driver is online
+                if (APP.isOnline) {
+                    const pending = APP.allRides.find(r => r.status === 'pending');
+                    if (pending) showRideAlert(pending);
+                }
             } catch (err) {
                 console.error('Load rides error:', err);
                 // Show demo data if Supabase not configured
