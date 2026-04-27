@@ -3133,14 +3133,22 @@
             const time = new Date(ride.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
             const date = new Date(ride.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
             const fare = ride.actual_fare || ride.estimated_fare || 0;
+            const avatarUrl = ride.customer_profile_image ||
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(ride.customer_name||'U')}&background=0050ff&color=fff`;
             return `
-    <div class="ride-item" id="ride-${ride.id}">
+    <div class="ride-item" id="ride-${ride.id}" onclick="openRideDetail(${JSON.stringify(JSON.stringify(ride))})" style="cursor:pointer">
       <div class="ride-item-top">
-        <span class="ride-status ${ride.status}">${ride.status.toUpperCase()}</span>
-        <span class="ride-fare">₹${fare}</span>
-      </div>
-      <div style="font-size:.8rem;color:var(--text-secondary);margin-bottom:8px">
-        👤 ${ride.customer_name} · 📞 ${ride.customer_mobile}
+        <div style="display:flex;align-items:center;gap:10px">
+          <img src="${avatarUrl}" style="width:38px;height:38px;border-radius:12px;object-fit:cover;border:2px solid var(--gray-light)" onerror="this.src='https://ui-avatars.com/api/?name=U&background=0050ff&color=fff'">
+          <div>
+            <div style="font-weight:700;font-size:.88rem">${ride.customer_name || 'Passenger'}</div>
+            <div style="font-size:.72rem;color:var(--text-secondary)">${ride.customer_mobile || ''}</div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <span class="ride-status ${ride.status}" style="display:block;margin-bottom:4px">${ride.status.toUpperCase()}</span>
+          <span class="ride-fare">₹${fare}</span>
+        </div>
       </div>
       <div class="ride-route">
         <div class="route-stop"><div class="route-dot pickup"></div>${ride.pickup_address}</div>
@@ -3598,7 +3606,93 @@
                 simulateNewRide();
             }
         }, 8000);
-    </script>
-</body>
 
+        // ─── RIDE DETAIL POPUP ───────────────────────────────────────
+        function openRideDetail(rideJson) {
+            const ride = JSON.parse(rideJson);
+            const overlay = document.getElementById('ride-detail-overlay');
+            overlay.style.display = 'flex';
+
+            const avatarUrl = ride.customer_profile_image ||
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(ride.customer_name||'U')}&background=0050ff&color=fff`;
+
+            document.getElementById('rd-passenger-img').src = avatarUrl;
+            document.getElementById('rd-passenger-name').textContent = ride.customer_name || 'Passenger';
+            document.getElementById('rd-passenger-mobile').textContent = ride.customer_mobile || '';
+            document.getElementById('rd-fare').textContent = '₹' + (ride.actual_fare || ride.estimated_fare || 0);
+            document.getElementById('rd-status').textContent = (ride.status || '').toUpperCase();
+            document.getElementById('rd-status').className = 'ride-status ' + ride.status;
+            document.getElementById('rd-pickup').textContent = ride.pickup_address || '—';
+            document.getElementById('rd-drop').textContent = ride.dropoff_address || '—';
+            document.getElementById('rd-call-btn').href = 'tel:' + (ride.customer_mobile || '');
+            document.getElementById('rd-chat-btn').onclick = () => {
+                window.location.href = 'chat.html?uid=' + encodeURIComponent(ride.customer_id || '') +
+                    '&name=' + encodeURIComponent(ride.customer_name || '') +
+                    '&mobile=' + encodeURIComponent(ride.customer_mobile || '') +
+                    '&img=' + encodeURIComponent(avatarUrl);
+            };
+
+            // Date & distance
+            const d = new Date(ride.created_at);
+            document.getElementById('rd-meta').textContent =
+                d.toLocaleString('en-IN', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) +
+                (ride.distance_km ? '  ·  ' + ride.distance_km + ' km' : '') +
+                '  ·  ' + (ride.payment_method || 'cash');
+        }
+
+        function closeRideDetail(ev) {
+            if (!ev || ev.target === document.getElementById('ride-detail-overlay')) {
+                document.getElementById('ride-detail-overlay').style.display = 'none';
+            }
+        }
+    </script>
+
+    <!-- ─── RIDE DETAIL POPUP OVERLAY ─────────────────────────── -->
+    <div id="ride-detail-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9000;display:none;align-items:flex-end;backdrop-filter:blur(6px)" onclick="closeRideDetail(event)">
+      <div style="background:#fff;border-radius:32px 32px 0 0;padding:24px 24px 40px;width:100%;max-height:88vh;overflow-y:auto;animation:slideUp .4s cubic-bezier(.17,.67,.83,.67)">
+        <div style="width:44px;height:5px;background:#eff2f6;border-radius:10px;margin:0 auto 24px"></div>
+
+        <!-- Passenger info -->
+        <div style="display:flex;align-items:center;gap:16px;background:#f8f9fc;border-radius:22px;padding:18px;margin-bottom:20px">
+          <img id="rd-passenger-img" src="" style="width:72px;height:72px;border-radius:22px;object-fit:cover;border:3px solid #0050ff;flex-shrink:0">
+          <div style="flex:1">
+            <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem" id="rd-passenger-name">Passenger</div>
+            <div style="font-size:.82rem;color:#8a9ab5;margin-top:3px" id="rd-passenger-mobile"></div>
+            <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+              <span id="rd-status" class="ride-status" style="font-size:.7rem">PENDING</span>
+              <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;color:#0a1628" id="rd-fare">₹0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Route -->
+        <div style="background:#f8f9fc;border-radius:20px;padding:18px;margin-bottom:20px">
+          <div style="display:flex;gap:12px;margin-bottom:12px">
+            <div style="width:12px;height:12px;border-radius:50%;background:#00c853;margin-top:4px;flex-shrink:0"></div>
+            <div style="font-size:.9rem;font-weight:600" id="rd-pickup">Pickup</div>
+          </div>
+          <div style="width:2px;height:16px;background:#eff2f6;margin-left:5px;margin-bottom:8px"></div>
+          <div style="display:flex;gap:12px">
+            <div style="width:12px;height:12px;border-radius:50%;background:#ff3d00;margin-top:4px;flex-shrink:0"></div>
+            <div style="font-size:.9rem;font-weight:600" id="rd-drop">Drop</div>
+          </div>
+        </div>
+
+        <!-- Meta info -->
+        <div style="font-size:.78rem;color:#8a9ab5;font-weight:600;text-align:center;margin-bottom:20px" id="rd-meta"></div>
+
+        <!-- Actions -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <a id="rd-call-btn" href="tel:" style="background:#e8f5e9;color:#2e7d32;border:none;padding:16px;border-radius:18px;font-weight:800;font-size:.9rem;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none">
+            📞 Call
+          </a>
+          <button id="rd-chat-btn" style="background:#eef4ff;color:#0050ff;border:none;padding:16px;border-radius:18px;font-weight:800;font-size:.9rem;cursor:pointer;font-family:'DM Sans',sans-serif">
+            💬 Chat
+          </button>
+        </div>
+        <button onclick="closeRideDetail()" style="width:100%;background:#f8f9fc;border:none;padding:16px;border-radius:18px;font-weight:700;font-size:.9rem;cursor:pointer;font-family:'DM Sans',sans-serif;color:#8a9ab5">Close</button>
+      </div>
+    </div>
+</body>
 </html>
+
