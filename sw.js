@@ -94,13 +94,13 @@ self.addEventListener('push', (event) => {
 
     const options = {
         body: data.body,
-        icon: 'icons/icon-192.png',
-        badge: 'icons/icon-72.png',
+        icon: 'auto.jpg',
+        badge: 'auto.jpg',
         vibrate: [200, 100, 200],
         data: data,
         actions: [
-            { action: 'accept', title: '✅ Accept', icon: 'icons/icon-72.png' },
-            { action: 'decline', title: '❌ Decline', icon: 'icons/icon-72.png' }
+            { action: 'accept', title: '✅ Accept', icon: 'auto.jpg' },
+            { action: 'decline', title: '❌ Decline', icon: 'auto.jpg' }
         ],
         requireInteraction: true,
         tag: 'ride-request'
@@ -144,8 +144,8 @@ self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
         self.registration.showNotification(event.data.title, {
             body: event.data.body,
-            icon: 'icons/icon-192.png',
-            badge: 'icons/icon-72.png',
+            icon: 'auto.jpg',
+            badge: 'auto.jpg',
             vibrate: [200, 100, 200],
             tag: event.data.tag || 'safarr',
             data: event.data.data || {}
