@@ -2607,6 +2607,13 @@
 
             updateGreeting();
             setInterval(updateGreeting, 60000);
+
+            // Handle back button for tabs
+            window.addEventListener('popstate', (e) => {
+                if (APP.currentTab !== 'home') {
+                    switchTab('home', false);
+                }
+            });
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -3108,7 +3115,10 @@
         // ═══════════════════════════════════════════════════════════════
         // TAB NAVIGATION
         // ═══════════════════════════════════════════════════════════════
-        function switchTab(tab) {
+        function switchTab(tab, push = true) {
+            if (push && tab !== APP.currentTab) {
+                history.pushState({ tab: tab }, '');
+            }
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.getElementById('tab-' + tab).classList.add('active');

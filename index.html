@@ -677,6 +677,11 @@
   </div>
 
   <script>
+    // Redirect if already logged in as driver
+    if (localStorage.getItem('sf_driver')) {
+      window.location.href = 'auto.html';
+    }
+
     // ─── Config ───────────────────────────────────────────────────────
     const STORAGE_KEY_PWA = 'safarr_pwa_dismissed';
     const STORAGE_KEY_INSTALLED = 'safarr_pwa_installed';
