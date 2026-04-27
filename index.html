@@ -3198,6 +3198,14 @@
             }
         }
 
+        window.onpopstate = function(event) {
+            if (event.state && event.state.tab) {
+                switchTab(event.state.tab, false);
+            } else if (APP.currentTab !== 'home') {
+                switchTab('home', false);
+            }
+        };
+
         function handleRideUpdate(payload) {
             const updated = payload.new;
             const idx = APP.allRides.findIndex(r => r.id === updated.id);
