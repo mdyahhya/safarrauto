@@ -32,29 +32,48 @@ self.addEventListener('fetch', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-    let data = { title: 'Safarr Driver', body: 'New notification' };
+    let data = { title: '🔔 New Ride Request!', body: 'A passenger is looking for an auto nearby.' };
     try { data = event.data.json(); } catch (e) {}
 
+    const options = {
+        body: data.body,
+        icon: 'auto.jpg',
+        badge: 'auto.jpg',
+        image: data.image || undefined,
+        data: { url: data.url || './index.html', rideId: data.rideId },
+        actions: [
+            { action: 'view',    title: '✅ View Request' },
+            { action: 'dismiss', title: '✗ Dismiss'       }
+        ],
+        requireInteraction: true,
+        vibrate: [300, 100, 300, 100, 300], // Stronger vibration for driver alerts
+        tag: 'ride-' + (data.rideId || Date.now()),
+        renotify: true
+    };
+
     event.waitUntil(
-        self.registration.showNotification(data.title, {
-            body: data.body,
-            icon: 'auto.jpg',
-            badge: 'auto.jpg',
-            vibrate: [200, 100, 200],
-            requireInteraction: true,
-            tag: 'ride-request'
-        })
+        self.registration.showNotification(data.title || '🔔 New Ride Request!', options)
     );
 });
 
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
+    
+    // Do nothing if dismissed
+    if (event.action === 'dismiss') return;
+    
+    const url = event.notification.data?.url || './index.html';
+    
     event.waitUntil(
-        clients.matchAll({ type: 'window' }).then((clientList) => {
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
             for (const client of clientList) {
-                if (client.url.includes('index.html') && 'focus' in client) return client.focus();
+                // If app is already open, focus it and you can even send a message via postMessage here if needed
+                if (client.url.includes(self.location.origin) && 'focus' in client) {
+                    return client.focus();
+                }
             }
-            return clients.openWindow('./index.html');
+            // If app was closed, open it
+            if (clients.openWindow) return clients.openWindow(url);
         })
     );
 });

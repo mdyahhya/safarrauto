@@ -2101,13 +2101,18 @@
             <!-- Live Ride Alert -->
             <div id="live-ride-alert">
                 <div class="ride-alert-badge">🔔 New Request</div>
+                <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
+                    <img id="alert-customer-img" src="user.jpg" style="width:50px; height:50px; border-radius:25px; object-fit:cover; border:2px solid var(--accent);">
+                    <div style="flex:1">
+                        <div class="ride-alert-title" id="alert-customer">Passenger Name</div>
+                        <div class="ride-alert-fare" id="alert-fare" style="margin-bottom:0; font-size:1.1rem;">₹—</div>
+                    </div>
+                </div>
                 <div style="padding-right:44px">
-                    <div class="ride-alert-title" id="alert-customer">Rahul Sharma</div>
                     <div class="ride-alert-route">
                         <span id="alert-from">📍 Pickup: —</span><br />
                         <span id="alert-to">📌 Drop: —</span>
                     </div>
-                    <div class="ride-alert-fare" id="alert-fare">₹—</div>
                 </div>
                 <svg class="ride-alert-timer" viewBox="0 0 36 36">
                     <circle class="timer-ring" cx="18" cy="18" r="15" fill="none" stroke-width="3" />
@@ -3209,9 +3214,17 @@
         function showRideAlert(ride) {
             APP.currentAlertRide = ride;
             document.getElementById('alert-customer').textContent = ride.customer_name;
-            document.getElementById('alert-from').textContent = '📍 ' + ride.pickup_address;
-            document.getElementById('alert-to').textContent = '📌 ' + ride.dropoff_address;
+            document.getElementById('alert-from').textContent = '📍 Pickup: ' + ride.pickup_address;
+            document.getElementById('alert-to').textContent = '📌 Drop: ' + ride.dropoff_address;
             document.getElementById('alert-fare').textContent = '₹' + (ride.estimated_fare || '—');
+            
+            const custImg = document.getElementById('alert-customer-img');
+            if (ride.customer_profile_image) {
+                custImg.src = ride.customer_profile_image;
+            } else {
+                custImg.src = 'user.jpg';
+            }
+
             document.getElementById('live-ride-alert').style.display = 'block';
             document.getElementById('btn-accept-ride').disabled = false;
             document.getElementById('btn-accept-ride').textContent = '✅ Accept';
@@ -3254,11 +3267,17 @@
             clearInterval(APP.timerInterval);
 
             try {
-                await _supabase.from('ride_bookings').update({
+                const updates = {
                     status: 'accepted',
                     driver_id: APP.driverData?.id || null,
-                    accepted_at: new Date().toISOString()
-                }).eq('id', ride.id);
+                    accepted_at: new Date().toISOString(),
+                    driver_name: APP.driverData?.full_name || 'Verified Driver',
+                    driver_mobile: APP.driverData?.mobile || '',
+                    auto_number: APP.driverData?.vehicle_number || '--',
+                    driver_profile_image: APP.driverData?.profile_image_url || null
+                };
+                
+                await _supabase.from('ride_bookings').update(updates).eq('id', ride.id);
                 showToastMsg('✅ Ride accepted!');
                 hideRideAlert();
             } catch (err) {
