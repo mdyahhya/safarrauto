@@ -2973,14 +2973,17 @@
             document.getElementById('earnings-change').textContent = '+0 rides today';
             document.getElementById('earn-today').textContent = '₹0';
 
-            // Profile image
-            if (d.profile_image_url) {
-                ['app-avatar-img', 'ph-img'].forEach(id => {
-                    const img = document.getElementById(id);
-                    img.src = d.profile_image_url;
+            // Profile image with cache buster
+            ['app-avatar-img', 'ph-img'].forEach(id => {
+                const img = document.getElementById(id);
+                if (d.profile_image_url) {
+                    img.src = d.profile_image_url + (d.profile_image_url.includes('?') ? '&' : '?') + 't=' + Date.now();
                     img.style.display = 'block';
-                });
-            }
+                } else {
+                    img.src = '';
+                    img.style.display = 'none';
+                }
+            });
 
             // Verification
             document.getElementById('badge-verified').textContent = d.is_verified ? '✓ Verified' : '⏳ Pending';
