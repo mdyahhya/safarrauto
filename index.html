@@ -2175,13 +2175,14 @@
                         <div class="qa-icon">🗺️</div>
                         <div class="qa-label">View Rides</div>
                     </div>
+                    <div class="quick-action" onclick="window.location.href='chat.html'">
+                        <div class="qa-icon">💬</div>
+                        <div class="qa-label">Messages</div>
+                        <div id="msg-badge" style="position:absolute; top:5px; right:15px; background:var(--danger); color:white; font-size:0.65rem; padding:2px 6px; border-radius:10px; display:none;">New</div>
+                    </div>
                     <div class="quick-action" onclick="switchTab('wallet')">
                         <div class="qa-icon">💰</div>
                         <div class="qa-label">Withdraw</div>
-                    </div>
-                    <div class="quick-action" onclick="openQR()">
-                        <div class="qa-icon">📱</div>
-                        <div class="qa-label">Share QR</div>
                     </div>
                     <div class="quick-action" onclick="switchTab('profile')">
                         <div class="qa-icon">👤</div>
@@ -2518,6 +2519,14 @@
                     </svg>
                 </div>
                 <span class="tab-label" id="tlbl-rides" data-t="rides">Rides</span>
+            </button>
+            <button class="tab-btn" id="tab-btn-chat" onclick="window.location.href='chat.html'">
+                <div class="tab-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8a9ab5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                </div>
+                <span class="tab-label">Chat</span>
             </button>
             <button class="tab-btn" id="tab-btn-wallet" onclick="switchTab('wallet')">
                 <div class="tab-icon">
@@ -3352,26 +3361,43 @@
         // TAB NAVIGATION
         // ═══════════════════════════════════════════════════════════════
         function switchTab(tab, push = true) {
-            if (push && tab !== APP.currentTab) {
+            if (tab === APP.currentTab) return;
+            
+            // Logic: No matter where we are, if we move to a sub-tab, we've visited a new state
+            if (push) {
                 history.pushState({ tab: tab }, '');
             }
+
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.getElementById('tab-' + tab).classList.add('active');
             document.getElementById('tab-btn-' + tab).classList.add('active');
             APP.currentTab = tab;
 
-            // Fix tabbar SVG stroke colors
-            document.querySelectorAll('.tab-btn:not(.active) .tab-icon svg path, .tab-btn:not(.active) .tab-icon svg circle, .tab-btn:not(.active) .tab-icon svg rect').forEach(el => {
-                el.setAttribute('stroke', '#8a9ab5');
-                el.setAttribute('fill', 'none');
-            });
-
+            // Update UI
             if (tab === 'rides') {
                 renderRidesList(APP.allRides);
                 document.getElementById('rides-badge').classList.remove('show');
             }
         }
+
+        // ═══════════════════════════════════════════════════════════════
+        // BACK BUTTON HANDLING (HOME -> EXIT)
+        // ═══════════════════════════════════════════════════════════════
+        window.addEventListener('popstate', (event) => {
+            if (APP.currentTab !== 'home') {
+                // If not on home, force back to home first
+                switchTab('home', false);
+                // Re-push home to history so next back exits
+                history.pushState({ tab: 'home' }, '');
+            } else {
+                // Already on home, let browser handle back (Close App)
+                history.back();
+            }
+        });
+
+        // Initialize history
+        history.replaceState({ tab: 'home' }, '');
 
         // ═══════════════════════════════════════════════════════════════
         // IN-APP NOTIFICATION
@@ -3695,4 +3721,3 @@
     </div>
 </body>
 </html>
-

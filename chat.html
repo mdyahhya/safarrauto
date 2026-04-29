@@ -65,6 +65,24 @@
     .voice-btn.recording{background:var(--danger);color:#fff;animation:pulse 1s ease infinite}
     @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,61,0,.4)}50%{box-shadow:0 0 0 10px rgba(255,61,0,0)}}
 
+    /* Translation Styles */
+    .lang-selector {
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 10px;
+      padding: 4px 8px; font-size: .75rem; font-weight: 700; color: #fff; outline: none;
+      cursor: pointer; font-family: inherit; margin-right: 5px;
+    }
+    .chat-panel .lang-selector { color: var(--navy); background: var(--off-white); border-color: var(--gray-light); }
+    .translation-card {
+      margin-top: 8px; padding: 10px; background: rgba(0,80,255,0.05); border-radius: 12px;
+      font-size: .85rem; color: var(--navy); border-left: 3px solid var(--primary);
+      display: flex; align-items: flex-start; gap: 8px;
+    }
+    .sent .translation-card { background: rgba(255,255,255,0.15); color: #fff; border-left-color: #fff; }
+    .speak-btn {
+      background: none; border: none; color: inherit; cursor: pointer; opacity: 0.7; padding: 2px;
+    }
+    .speak-btn:hover { opacity: 1; }
+
     .rec-bar{background:var(--danger);color:#fff;padding:10px 20px;text-align:center;font-weight:700;font-size:.85rem;display:none;align-items:center;gap:8px;justify-content:center;flex-shrink:0}
     .rec-dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:blink 1s ease infinite}
     @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
@@ -103,6 +121,11 @@
         <div class="panel-name" id="panel-name">Passenger</div>
         <div class="panel-status">● Active now</div>
       </div>
+      <select class="lang-selector" id="driver-lang" onchange="updateDriverLang()">
+        <option value="English">English</option>
+        <option value="Hindi">Hindi</option>
+        <option value="Marathi">Marathi</option>
+      </select>
       <a class="panel-call" id="panel-call" href="tel:">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.07 12 19.79 19.79 0 0 1 1 3.18 2 2 0 0 1 2.96 1h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.71 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.58 2.81.71A2 2 0 0 1 22 16.92z"/></svg>
       </a>
@@ -140,6 +163,12 @@
     let isRecording = false;
 
     window.onload = async () => {
+      // Load preference
+      const { data: dData } = await _supabase.from('auto_drivers').select('language').eq('id', DRIVER_ID).single();
+      if (dData) {
+        document.getElementById('driver-lang').value = dData.language || 'English';
+      }
+
       // Check if opened directly to a specific passenger (from ride popup)
       const params = new URLSearchParams(window.location.search);
       const uid   = params.get('uid');
@@ -155,6 +184,12 @@
         openChat(uid, name, mob || '', img || '');
       }
     };
+
+    async function updateDriverLang() {
+      const lang = document.getElementById('driver-lang').value;
+      await _supabase.from('auto_drivers').update({ language: lang }).eq('id', DRIVER_ID);
+      showToast('Language set to ' + lang);
+    }
 
     // ── Load unique passengers who messaged the driver ──────────
     async function loadConversations() {
@@ -176,17 +211,30 @@
       });
 
       const convs = Object.values(seen);
+      
+      // Fetch profile images for these senders
+      const senderIds = convs.map(c => c.sender_id);
+      const { data: userData } = await _supabase.from('safarr_users').select('id, profile_image_url').in('id', senderIds);
+      const userMap = {};
+      
+      if (userData) {
+        userData.forEach(u => { userMap[u.id] = u.profile_image_url; });
+      }
+
       document.getElementById('conv-count').textContent = convs.length + ' conversation' + (convs.length !== 1 ? 's' : '');
 
-      document.getElementById('conv-list').innerHTML = convs.map(m => `
-        <div class="conv-card" onclick="openChat('${m.sender_id}','${escHtml(m.sender_name || 'Passenger')}','','')">
-          <img class="conv-avatar" src="https://ui-avatars.com/api/?name=${encodeURIComponent(m.sender_name||'U')}&background=0050ff&color=fff" onerror="this.src='https://ui-avatars.com/api/?name=U&background=0050ff&color=fff'">
+      document.getElementById('conv-list').innerHTML = convs.map(m => {
+        const pImg = userMap[m.sender_id] || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.sender_name||'U')}&background=0050ff&color=fff`;
+        return `
+        <div class="conv-card" onclick="openChat('${m.sender_id}','${escHtml(m.sender_name || 'Passenger')}','','${pImg}')">
+          <img class="conv-avatar" src="${pImg}" onerror="this.src='https://ui-avatars.com/api/?name=U&background=0050ff&color=fff'">
           <div class="conv-info">
             <div class="conv-name">${escHtml(m.sender_name || 'Passenger')}</div>
             <div class="conv-preview">${escHtml(m.message_type === 'voice' ? '🎤 Voice message' : m.message || '')}</div>
           </div>
           <div class="conv-time">${timeFmt(m.created_at)}</div>
-        </div>`).join('');
+        </div>`;
+      }).join('');
     }
 
     // ── Subscribe to new incoming messages (realtime) ─────────
@@ -216,6 +264,9 @@
       document.getElementById('messages-feed').innerHTML = '';
       document.getElementById('chat-panel').classList.add('open');
 
+      // Fetch passenger's preferred language
+      fetchPassengerLang(passengerId);
+
       // Load messages for this passenger
       const { data } = await _supabase
         .from('safarr_messages')
@@ -225,6 +276,12 @@
 
       if (data?.length) data.forEach(appendMessage);
       scrollBottom();
+    }
+
+    let passengerLang = 'English';
+    async function fetchPassengerLang(uid) {
+      const { data } = await _supabase.from('safarr_users').select('preferred_language').eq('id', uid).single();
+      if (data) passengerLang = data.preferred_language || 'English';
     }
 
     // Open chat from ride card (called with full ride data)
@@ -246,12 +303,25 @@
       let bubbleHtml = '';
       if (msg.message_type === 'voice' && msg.voice_url) {
         bubbleHtml = `<div class="voice-bubble">
-          <button class="voice-play" onclick="playVoice('${msg.voice_url}',this)">
+          <button class="voice-play" onclick="playVoice('${msg.voice_url}',this,'${msg.translated_text ? msg.translated_text.replace(/'/g, "\\'") : ''}')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
           <div style="flex:1;height:20px;background:${isSent ? 'rgba(255,255,255,.3)' : 'rgba(0,80,255,.15)'};border-radius:10px"></div>
           <span style="font-size:.72rem;opacity:.7">${msg.voice_duration || '0:05'}</span>
         </div>`;
+
+        if (msg.translated_text) {
+          bubbleHtml += `
+            <div class="translation-card">
+              <button class="speak-btn" onclick="speakText('${msg.translated_text.replace(/'/g, "\\'")}')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+              </button>
+              <div>
+                <div style="font-size:0.6rem; opacity:0.6; margin-bottom:2px">AI TRANSLATION</div>
+                ${msg.translated_text}
+              </div>
+            </div>`;
+        }
       } else {
         bubbleHtml = escHtml(msg.message || '');
       }
@@ -263,6 +333,16 @@
         ${!isSent ? `<img class="msg-avatar" src="${activePassenger?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(activePassenger?.name||'U')}&background=0050ff&color=fff`}">` : ''}
         <div class="msg-bubble">${bubbleHtml}<span class="msg-time">${time}${isSent ? ' ✓' : ''}</span></div>`;
       feed.appendChild(row);
+    }
+
+    function speakText(text) {
+      if (!text) return;
+      const utterance = new SpeechSynthesisUtterance(text);
+      const myLang = document.getElementById('driver-lang').value;
+      if (myLang === 'Hindi') utterance.lang = 'hi-IN';
+      else if (myLang === 'Marathi') utterance.lang = 'mr-IN';
+      else utterance.lang = 'en-IN';
+      window.speechSynthesis.speak(utterance);
     }
 
     // ── Send a text message ────────────────────────────────────
@@ -312,25 +392,76 @@
     async function sendVoiceMessage() {
       if (!activePassenger) return;
       const blob = new Blob(recordingChunks, { type: 'audio/webm' });
+
+      // 1. Get AI Translation
+      showToast('AI translating...');
+      let translatedText = '';
+      try {
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        const base64 = await new Promise(resolve => {
+          reader.onloadend = () => resolve(reader.result.split(',')[1]);
+        });
+
+        const aiRes = await fetch('/.netlify/functions/translate-voice', {
+          method: 'POST',
+          body: JSON.stringify({ audio: base64, targetLang: passengerLang })
+        });
+        const aiData = await aiRes.json();
+        translatedText = aiData.translatedText || '';
+      } catch (e) { console.error('AI Error:', e); }
+
+      // 2. Upload to Storage
       const path = `voice/driver_${Date.now()}.webm`;
       const { error: upErr } = await _supabase.storage.from('safarr-storage').upload(path, blob);
       if (upErr) { showToast('Upload failed'); return; }
+      
       const { data: urlData } = _supabase.storage.from('safarr-storage').getPublicUrl(path);
       const msg = {
         sender_id: DRIVER_ID, sender_type: 'driver', sender_name: DRIVER_NAME,
         receiver_id: activePassenger.id, message: '🎤 Voice message',
-        message_type: 'voice', voice_url: urlData.publicUrl, voice_duration: '0:05'
+        message_type: 'voice', voice_url: urlData.publicUrl, voice_duration: '0:05',
+        translated_text: translatedText
       };
       const { data } = await _supabase.from('safarr_messages').insert(msg).select().single();
       if (data) { appendMessage(data); scrollBottom(); }
     }
 
-    function playVoice(url, btn) {
-      const audio = new Audio(url);
-      audio.play();
-      btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
-      audio.onended = () => {
-        btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+    let currentAudio = null;
+    let activePlayBtn = null;
+
+    function playVoice(url, btn, transText) {
+      const playIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+      const pauseIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+
+      if (currentAudio && activePlayBtn) {
+        if (currentAudio.src === url) {
+          if (!currentAudio.paused) {
+            currentAudio.pause();
+            btn.innerHTML = playIcon;
+            return;
+          } else {
+            currentAudio.play();
+            btn.innerHTML = pauseIcon;
+            if (transText) speakText(transText); // Auto-speak translation
+            return;
+          }
+        } else {
+          currentAudio.pause();
+          activePlayBtn.innerHTML = playIcon;
+        }
+      }
+
+      currentAudio = new Audio(url);
+      activePlayBtn = btn;
+      currentAudio.play();
+      btn.innerHTML = pauseIcon;
+      if (transText) speakText(transText); // Auto-speak translation
+
+      currentAudio.onended = () => {
+        btn.innerHTML = playIcon;
+        currentAudio = null;
+        activePlayBtn = null;
       };
     }
 
