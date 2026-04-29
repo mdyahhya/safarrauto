@@ -163,11 +163,13 @@
     let isRecording = false;
 
     window.onload = async () => {
-      // Load preference
-      const { data: dData } = await _supabase.from('auto_drivers').select('language').eq('id', DRIVER_ID).single();
-      if (dData) {
-        document.getElementById('driver-lang').value = dData.language || 'English';
-      }
+      try {
+        // Load preference
+        const { data: dData, error: dErr } = await _supabase.from('auto_drivers').select('language').eq('id', DRIVER_ID).single();
+        if (!dErr && dData) {
+          document.getElementById('driver-lang').value = dData.language || 'English';
+        }
+      } catch (e) { console.warn('Driver lang fetch failed:', e); }
 
       // Check if opened directly to a specific passenger (from ride popup)
       const params = new URLSearchParams(window.location.search);
@@ -280,8 +282,10 @@
 
     let passengerLang = 'English';
     async function fetchPassengerLang(uid) {
-      const { data } = await _supabase.from('safarr_users').select('preferred_language').eq('id', uid).single();
-      if (data) passengerLang = data.preferred_language || 'English';
+      try {
+        const { data, error } = await _supabase.from('safarr_users').select('preferred_language').eq('id', uid).single();
+        if (!error && data) passengerLang = data.preferred_language || 'English';
+      } catch (e) { console.warn('Passenger lang fetch failed:', e); }
     }
 
     // Open chat from ride card (called with full ride data)
@@ -390,41 +394,66 @@
     }
 
     async function sendVoiceMessage() {
-      if (!activePassenger) return;
+      if (!activePassenger || !recordingChunks.length) return;
       const blob = new Blob(recordingChunks, { type: 'audio/webm' });
 
-      // 1. Get AI Translation
-      showToast('AI translating...');
+      // 1. Get AI Translation (Fail-safe)
       let translatedText = '';
       try {
+        showToast('AI translating...');
         const reader = new FileReader();
         reader.readAsDataURL(blob);
-        const base64 = await new Promise(resolve => {
+        const base64 = await new Promise((resolve, reject) => {
           reader.onloadend = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
         });
 
         const aiRes = await fetch('/.netlify/functions/translate-voice', {
           method: 'POST',
           body: JSON.stringify({ audio: base64, targetLang: passengerLang })
         });
-        const aiData = await aiRes.json();
-        translatedText = aiData.translatedText || '';
-      } catch (e) { console.error('AI Error:', e); }
+        
+        if (aiRes.ok) {
+          const aiData = await aiRes.json();
+          translatedText = aiData.translatedText || '';
+        } else {
+          const errData = await aiRes.json().catch(() => ({}));
+          console.error('Netlify Function Error:', aiRes.status, errData);
+        }
+      } catch (e) { 
+        console.error('AI Processing Skip (Translation Failed):', e); 
+      }
 
       // 2. Upload to Storage
-      const path = `voice/driver_${Date.now()}.webm`;
-      const { error: upErr } = await _supabase.storage.from('safarr-storage').upload(path, blob);
-      if (upErr) { showToast('Upload failed'); return; }
-      
-      const { data: urlData } = _supabase.storage.from('safarr-storage').getPublicUrl(path);
-      const msg = {
-        sender_id: DRIVER_ID, sender_type: 'driver', sender_name: DRIVER_NAME,
-        receiver_id: activePassenger.id, message: '🎤 Voice message',
-        message_type: 'voice', voice_url: urlData.publicUrl, voice_duration: '0:05',
-        translated_text: translatedText
-      };
-      const { data } = await _supabase.from('safarr_messages').insert(msg).select().single();
-      if (data) { appendMessage(data); scrollBottom(); }
+      try {
+        const path = `voice/driver_${Date.now()}.webm`;
+        const { error: upErr } = await _supabase.storage.from('safarr-storage').upload(path, blob);
+        if (upErr) throw upErr;
+        
+        const { data: urlData } = _supabase.storage.from('safarr-storage').getPublicUrl(path);
+        const msg = {
+          sender_id: DRIVER_ID, sender_type: 'driver', sender_name: DRIVER_NAME,
+          receiver_id: activePassenger.id, message: '🎤 Voice message',
+          message_type: 'voice', voice_url: urlData.publicUrl, voice_duration: '0:05',
+          translated_text: translatedText
+        };
+
+        // 3. Save to DB (Fail-safe)
+        const { data, error: insErr } = await _supabase.from('safarr_messages').insert(msg).select().single();
+        if (insErr) {
+          console.warn('First insert failed, retrying without translated_text:', insErr.message);
+          delete msg.translated_text;
+          const { data: d2, error: insErr2 } = await _supabase.from('safarr_messages').insert(msg).select().single();
+          if (insErr2) throw insErr2;
+          if (d2) { appendMessage(d2); scrollBottom(); }
+        } else if (data) { 
+          appendMessage(data); 
+          scrollBottom(); 
+        }
+      } catch (e) {
+        console.error('Critical Upload Error:', e);
+        showToast('Message failed to send');
+      }
     }
 
     let currentAudio = null;
