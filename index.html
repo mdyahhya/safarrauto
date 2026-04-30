@@ -564,22 +564,26 @@
         /* ─── AI AGENT ────────────────────────────────────────────── */
         .ai-agent-container {
             position: fixed;
-            bottom: 24px;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            width: 90px;
-            height: 90px;
+            width: 60px;
+            height: 60px;
             border-radius: 50%;
             background: var(--navy);
-            box-shadow: 0 4px 25px rgba(0, 80, 255, 0.4);
-            border: 3px solid var(--accent);
+            box-shadow: 0 4px 20px rgba(0, 80, 255, 0.45);
+            border: 2px solid var(--accent);
             z-index: 1000;
             overflow: hidden;
-            display: flex;
+            display: none;
             align-items: center;
             justify-content: center;
             transition: all 0.3s ease;
             pointer-events: none;
+        }
+
+        .ai-agent-container.visible {
+            display: flex;
         }
 
         .ai-agent-video {
@@ -2904,8 +2908,8 @@
             document.getElementById('screen-onboard').scrollTo(0, 0);
             
             // AI Guidance for step change
-            if(n === 1) AI_AGENT.speakOnboarding('driver');
-            if(n === 2) AI_AGENT.speakOnboarding('auto');
+            if (n === 1) { AI_AGENT.show(); AI_AGENT.speakOnboarding('driver'); }
+            if (n === 2) { AI_AGENT.show(); AI_AGENT.speakOnboarding('auto'); }
         }
 
         function previewProfile(input) {
@@ -3003,6 +3007,7 @@
 
                 showToastMsg('🎉 Registration complete!');
                 setTimeout(() => {
+                    AI_AGENT.hide();   // Agent done — hide it now
                     showScreen('screen-app');
                     applyLang();
                     populateApp();
@@ -3758,83 +3763,136 @@
             <source src="ai-agent.mp4" type="video/mp4">
         </video>
     </div>
-    <audio id="ai-audio-player"></audio>
-
     <script>
+        // ── AI SPEAKING AGENT — Web Speech API (no audio files needed) ──
         const AI_AGENT = {
             currentLang: 'English',
-            player: null,
-            isPlaying: false,
-            
+            video: null,
+            highlightTimers: [],
+            synth: window.speechSynthesis,
+
+            // Script for each screen & language
+            SCRIPTS: {
+                'lang': {
+                    English: "Welcome to Safarr. Please choose your language.",
+                    Hindi:   "सफ़र में आपका स्वागत है। कृपया अपनी भाषा चुनें।",
+                    Marathi: "सफ़र मध्ये आपले स्वागत आहे. कृपया तुमची भाषा निवडा."
+                },
+                'driver': {
+                    English: "Let's fill your driver details. Please enter your full name. Then enter your mobile number. Then fill in your address.",
+                    Hindi:   "चलिए आपकी जानकारी भरते हैं। अपना पूरा नाम लिखें। फिर मोबाइल नंबर डालें। फिर अपना पता भरें।",
+                    Marathi: "चला तुमची माहिती भरूया. तुमचे पूर्ण नाव लिहा. मग मोबाइल नंबर टाका. मग तुमचा पत्ता भरा."
+                },
+                'auto': {
+                    English: "Now enter your auto details. Please enter your vehicle number. Then enter the make or brand of your auto.",
+                    Hindi:   "अब अपने ऑटो की जानकारी दें। गाड़ी का नंबर लिखें। फिर ऑटो का ब्रांड या कंपनी का नाम लिखें।",
+                    Marathi: "आता तुमच्या ऑटोची माहिती द्या. वाहन नंबर लिहा. मग ऑटोचा ब्रँड किंवा कंपनीचे नाव लिहा."
+                }
+            },
+
+            // BCP-47 voice language codes
+            LANG_CODE: {
+                English: 'en-IN',
+                Hindi:   'hi-IN',
+                Marathi: 'mr-IN'
+            },
+
             init() {
-                this.player = document.getElementById('ai-audio-player');
-                const video = document.getElementById('ai-video');
-                
-                // Autoplay prompt on Language Screen
-                setTimeout(() => {
-                    this.play('select-lang.mp3');
-                    video.play().catch(e => console.log("Video autoplay blocked"));
-                }, 1000);
+                this.video = document.getElementById('ai-video');
+                this.show();
+                this.video.play().catch(() => {});
+                // Speak the language-selection prompt
+                setTimeout(() => this.speak('lang'), 800);
+            },
+
+            show() {
+                document.getElementById('ai-agent-ui').classList.add('visible');
+            },
+
+            hide() {
+                this.stopSpeech();
+                this.clearHighlights();
+                document.getElementById('ai-agent-ui').classList.remove('visible');
             },
 
             setLanguage(lang) {
-                this.currentLang = lang;
-                this.stop();
+                const map = { en: 'English', hi: 'Hindi', mr: 'Marathi' };
+                this.currentLang = map[lang] || 'English';
+                this.stopSpeech();
             },
 
-            play(src, callback) {
-                this.stop();
-                this.player.src = src;
-                this.player.play().catch(e => console.log("Audio play blocked"));
-                this.isPlaying = true;
-                if(callback) this.player.onended = callback;
+            speak(scriptKey) {
+                this.stopSpeech();
+                const text = (this.SCRIPTS[scriptKey] || {})[this.currentLang]
+                           || this.SCRIPTS[scriptKey]['English'];
+                if (!text || !this.synth) return;
+
+                const utter = new SpeechSynthesisUtterance(text);
+                utter.lang = this.LANG_CODE[this.currentLang] || 'en-IN';
+                utter.rate = 0.92;
+                utter.pitch = 1.05;
+
+                // Pick the best matching voice if available
+                const voices = this.synth.getVoices();
+                const match = voices.find(v => v.lang === utter.lang)
+                           || voices.find(v => v.lang.startsWith(utter.lang.split('-')[0]));
+                if (match) utter.voice = match;
+
+                this.synth.speak(utter);
             },
 
-            stop() {
-                this.player.pause();
-                this.player.currentTime = 0;
-                this.isPlaying = false;
+            stopSpeech() {
+                if (this.synth) this.synth.cancel();
+                this.highlightTimers.forEach(t => clearTimeout(t));
+                this.highlightTimers = [];
                 this.clearHighlights();
             },
 
             highlight(id) {
                 this.clearHighlights();
                 const el = document.getElementById(id);
-                if(el) el.classList.add('glow-highlight');
+                if (el) {
+                    el.classList.add('glow-highlight');
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
             },
 
             clearHighlights() {
-                document.querySelectorAll('.glow-highlight').forEach(el => el.classList.remove('glow-highlight'));
+                document.querySelectorAll('.glow-highlight')
+                    .forEach(el => el.classList.remove('glow-highlight'));
             },
 
             speakOnboarding(step) {
-                const langCode = this.currentLang.toLowerCase().substring(0, 2); // hi, ma, en
-                const audioFile = `onboarding-${step}-${langCode}.mp3`;
-                
-                this.play(audioFile);
+                this.speak(step);
 
-                // Field Highlighting Sequence
-                if(step === 'driver') {
+                // Clear any previous timers
+                this.highlightTimers.forEach(t => clearTimeout(t));
+                this.highlightTimers = [];
+
+                if (step === 'driver') {
                     this.highlight('inp-name');
-                    setTimeout(() => this.highlight('inp-mobile'), 4000);
-                    setTimeout(() => this.highlight('inp-addr1'), 8000);
-                } else if(step === 'auto') {
+                    this.highlightTimers.push(setTimeout(() => this.highlight('inp-mobile'),  4500));
+                    this.highlightTimers.push(setTimeout(() => this.highlight('inp-addr1'),   9000));
+                    this.highlightTimers.push(setTimeout(() => this.clearHighlights(),       13500));
+                } else if (step === 'auto') {
                     this.highlight('inp-vnum');
-                    setTimeout(() => this.highlight('inp-vmake'), 4000);
+                    this.highlightTimers.push(setTimeout(() => this.highlight('inp-vmake'),   4500));
+                    this.highlightTimers.push(setTimeout(() => this.clearHighlights(),        9000));
                 }
             }
         };
 
-        // Stop AI when user starts typing
+        // Stop speaking the moment the user taps any input
         document.addEventListener('focusin', (e) => {
-            if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-                AI_AGENT.stop();
+            if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) {
+                AI_AGENT.stopSpeech();
             }
         });
 
-        window.addEventListener('load', () => {
-            AI_AGENT.init();
-        });
+        // Voices load async — re-trigger init speech if needed
+        window.speechSynthesis.onvoiceschanged = () => {};
+
+        window.addEventListener('DOMContentLoaded', () => AI_AGENT.init());
     </script>
 </body>
 </html>
