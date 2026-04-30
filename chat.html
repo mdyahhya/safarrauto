@@ -169,6 +169,7 @@
       try {
         const { data, error } = await _supabase.from('auto_drivers').select('language').eq('id', DRIVER_ID).single();
         if (!error && data) {
+          alert('DEBUG: Your DB Language is currently: ' + data.language);
           document.getElementById('driver-lang').value = data.language || 'English';
         }
       } catch (e) { console.warn('Sync driver lang failed:', e); }
