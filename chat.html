@@ -169,7 +169,6 @@
       try {
         const { data, error } = await _supabase.from('auto_drivers').select('language').eq('id', DRIVER_ID).single();
         if (!error && data) {
-          alert('DEBUG: Your DB Language is currently: ' + data.language);
           document.getElementById('driver-lang').value = data.language || 'English';
         }
       } catch (e) { console.warn('Sync driver lang failed:', e); }
@@ -193,8 +192,16 @@
     async function updateDriverLang() {
       try {
         const lang = document.getElementById('driver-lang').value;
-        const { error } = await _supabase.from('auto_drivers').update({ language: lang }).eq('id', DRIVER_ID);
-        if (error) throw error;
+        // Try 1: Capitalized (like User panel)
+        let { error } = await _supabase.from('auto_drivers').update({ language: lang }).eq('id', DRIVER_ID);
+        
+        if (error) {
+          console.warn('Capitalized update failed, trying lowercase...', error.message);
+          // Try 2: Lowercase (Database might be case-sensitive)
+          let { error: err2 } = await _supabase.from('auto_drivers').update({ language: lang.toLowerCase() }).eq('id', DRIVER_ID);
+          if (err2) throw err2;
+        }
+        
         showToast('Language set to ' + lang);
       } catch (e) {
         console.error('Update driver lang error:', e);
