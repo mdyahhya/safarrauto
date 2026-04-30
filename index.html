@@ -561,6 +561,40 @@
             color: var(--success);
         }
 
+        /* ─── AI AGENT ────────────────────────────────────────────── */
+        .ai-agent-container {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background: var(--navy);
+            box-shadow: 0 4px 25px rgba(0, 80, 255, 0.4);
+            border: 3px solid var(--accent);
+            z-index: 1000;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+
+        .ai-agent-video {
+            width: 140%;
+            height: 140%;
+            object-fit: cover;
+        }
+
+        .glow-highlight {
+            border-color: var(--accent) !important;
+            box-shadow: 0 0 15px rgba(0, 80, 255, 0.5) !important;
+            transform: scale(1.02);
+            transition: all 0.4s ease;
+        }
+
         /* ─── TAB CONTENT ─────────────────────────────────────────── */
         .tab-content {
             display: none;
@@ -781,28 +815,13 @@
         }
 
         @keyframes pulse-border {
-
             0%,
             100% {
-                box-shadow: 0 0 0 0 rgba(0, 80, 255, .4)
+                box-shadow: 0 0 0 0 rgba(0, 80, 255, .4);
             }
-
             50% {
-                box-shadow: 0 0 0 8px rgba(0, 80, 255, 0)
+                box-shadow: 0 0 0 8px rgba(0, 80, 255, 0);
             }
-        }
-
-        .ride-alert-badge {
-            background: var(--danger);
-            color: white;
-            font-size: .68rem;
-            font-weight: 700;
-            padding: 3px 8px;
-            border-radius: 20px;
-            display: inline-block;
-            margin-bottom: 10px;
-            letter-spacing: .04em;
-            text-transform: uppercase;
         }
 
         .ride-alert-title {
@@ -2760,7 +2779,13 @@
             if (!name || !mobile || !pass) { showToastMsg('Fill all fields'); return; }
             if (pass.length < 4) { showToastMsg('Password too short'); return; }
 
-            const payload = { full_name: name, mobile: mobile, password: pass };
+            const langMap = { en: 'English', hi: 'Hindi', mr: 'Marathi' };
+            const payload = { 
+                full_name: name, 
+                mobile: mobile, 
+                password: pass,
+                language: langMap[APP.lang] || 'English'
+            };
             
             const { data: existing } = await _supabase.from('auto_drivers').select('id').eq('mobile', mobile).single();
             if (existing) { showToastMsg('Mobile already registered'); return; }
@@ -2775,6 +2800,7 @@
             document.getElementById('inp-name').value = name;
             document.getElementById('inp-mobile').value = mobile;
             showScreen('screen-onboard');
+            AI_AGENT.speakOnboarding('driver');
             showToastMsg('Profile created! Now complete onboarding.');
         }
 
@@ -2834,6 +2860,7 @@
         // ═══════════════════════════════════════════════════════════════
         function setLang(lang) {
             APP.lang = lang;
+            AI_AGENT.setLanguage(lang);
             localStorage.setItem('sf_lang', lang);
             document.querySelectorAll('.lang-check').forEach(c => c.style.display = 'none');
             const el = document.getElementById('check-' + lang);
@@ -2875,6 +2902,10 @@
             document.getElementById('step-' + n).classList.add('active');
             document.getElementById('ob-progress').style.width = (n === 1 ? 33 : 66) + '%';
             document.getElementById('screen-onboard').scrollTo(0, 0);
+            
+            // AI Guidance for step change
+            if(n === 1) AI_AGENT.speakOnboarding('driver');
+            if(n === 2) AI_AGENT.speakOnboarding('auto');
         }
 
         function previewProfile(input) {
@@ -2908,6 +2939,7 @@
             btnText.textContent = 'Saving...';
             document.getElementById('ob-progress').style.width = '100%';
 
+            const langMap = { en: 'English', hi: 'Hindi', mr: 'Marathi' };
             const driverPayload = {
                 full_name: document.getElementById('inp-name').value.trim(),
                 mobile: document.getElementById('inp-mobile').value.trim(),
@@ -2920,15 +2952,16 @@
                 pincode: document.getElementById('inp-pin').value.trim() || null,
                 aadhar_number: document.getElementById('inp-aadhar').value.trim() || null,
                 pan_number: document.getElementById('inp-pan').value.trim().toUpperCase() || null,
-                language: APP.lang,
+                language: langMap[APP.lang] || 'English',
                 onboarding_complete: true,
             };
 
             try {
-                // Insert driver
+                // Update existing driver
                 const { data: driver, error: dErr } = await _supabase
                     .from('auto_drivers')
-                    .insert(driverPayload)
+                    .update(driverPayload)
+                    .eq('id', APP.driverData.id)
                     .select()
                     .single();
 
@@ -3719,5 +3752,89 @@
         <button onclick="closeRideDetail()" style="width:100%;background:#f8f9fc;border:none;padding:16px;border-radius:18px;font-weight:700;font-size:.9rem;cursor:pointer;font-family:'DM Sans',sans-serif;color:#8a9ab5">Close</button>
       </div>
     </div>
+    <!-- AI Speaking Agent -->
+    <div class="ai-agent-container" id="ai-agent-ui">
+        <video class="ai-agent-video" id="ai-video" loop muted playsinline>
+            <source src="ai-agent.mp4" type="video/mp4">
+        </video>
+    </div>
+    <audio id="ai-audio-player"></audio>
+
+    <script>
+        const AI_AGENT = {
+            currentLang: 'English',
+            player: null,
+            isPlaying: false,
+            
+            init() {
+                this.player = document.getElementById('ai-audio-player');
+                const video = document.getElementById('ai-video');
+                
+                // Autoplay prompt on Language Screen
+                setTimeout(() => {
+                    this.play('select-lang.mp3');
+                    video.play().catch(e => console.log("Video autoplay blocked"));
+                }, 1000);
+            },
+
+            setLanguage(lang) {
+                this.currentLang = lang;
+                this.stop();
+            },
+
+            play(src, callback) {
+                this.stop();
+                this.player.src = src;
+                this.player.play().catch(e => console.log("Audio play blocked"));
+                this.isPlaying = true;
+                if(callback) this.player.onended = callback;
+            },
+
+            stop() {
+                this.player.pause();
+                this.player.currentTime = 0;
+                this.isPlaying = false;
+                this.clearHighlights();
+            },
+
+            highlight(id) {
+                this.clearHighlights();
+                const el = document.getElementById(id);
+                if(el) el.classList.add('glow-highlight');
+            },
+
+            clearHighlights() {
+                document.querySelectorAll('.glow-highlight').forEach(el => el.classList.remove('glow-highlight'));
+            },
+
+            speakOnboarding(step) {
+                const langCode = this.currentLang.toLowerCase().substring(0, 2); // hi, ma, en
+                const audioFile = `onboarding-${step}-${langCode}.mp3`;
+                
+                this.play(audioFile);
+
+                // Field Highlighting Sequence
+                if(step === 'driver') {
+                    this.highlight('inp-name');
+                    setTimeout(() => this.highlight('inp-mobile'), 4000);
+                    setTimeout(() => this.highlight('inp-addr1'), 8000);
+                } else if(step === 'auto') {
+                    this.highlight('inp-vnum');
+                    setTimeout(() => this.highlight('inp-vmake'), 4000);
+                }
+            }
+        };
+
+        // Stop AI when user starts typing
+        document.addEventListener('focusin', (e) => {
+            if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                AI_AGENT.stop();
+            }
+        });
+
+        window.addEventListener('load', () => {
+            AI_AGENT.init();
+        });
+    </script>
 </body>
 </html>
