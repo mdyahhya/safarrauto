@@ -169,7 +169,12 @@
       try {
         const { data, error } = await _supabase.from('auto_drivers').select('language').eq('id', DRIVER_ID).single();
         if (!error && data) {
-          document.getElementById('driver-lang').value = data.language || 'English';
+          let dbLang = data.language || 'English';
+          // Normalize to Capitalized (e.g., 'hindi' -> 'Hindi')
+          dbLang = dbLang.charAt(0).toUpperCase() + dbLang.slice(1).toLowerCase();
+          
+          const el = document.getElementById('driver-lang');
+          if (el) el.value = dbLang;
         }
       } catch (e) { console.warn('Sync driver lang failed:', e); }
 
