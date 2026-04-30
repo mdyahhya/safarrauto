@@ -165,13 +165,13 @@
     let isRecording = false;
 
     window.onload = async () => {
+      // PERMANENT FIX: Always fetch latest lang from DB on load
       try {
-        // Load preference
-        const { data: dData, error: dErr } = await _supabase.from('auto_drivers').select('language').eq('id', DRIVER_ID).single();
-        if (!dErr && dData) {
-          document.getElementById('driver-lang').value = dData.language || 'English';
+        const { data, error } = await _supabase.from('auto_drivers').select('language').eq('id', DRIVER_ID).single();
+        if (!error && data) {
+          document.getElementById('driver-lang').value = data.language || 'English';
         }
-      } catch (e) { console.warn('Driver lang fetch failed:', e); }
+      } catch (e) { console.warn('Sync driver lang failed:', e); }
 
       // Check if opened directly to a specific passenger (from ride popup)
       const params = new URLSearchParams(window.location.search);
@@ -190,9 +190,15 @@
     };
 
     async function updateDriverLang() {
-      const lang = document.getElementById('driver-lang').value;
-      await _supabase.from('auto_drivers').update({ language: lang }).eq('id', DRIVER_ID);
-      showToast('Language set to ' + lang);
+      try {
+        const lang = document.getElementById('driver-lang').value;
+        const { error } = await _supabase.from('auto_drivers').update({ language: lang }).eq('id', DRIVER_ID);
+        if (error) throw error;
+        showToast('Language set to ' + lang);
+      } catch (e) {
+        console.error('Update driver lang error:', e);
+        showToast('Error saving language');
+      }
     }
 
     // ── Load unique passengers who messaged the driver ──────────
