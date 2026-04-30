@@ -2731,8 +2731,11 @@
                 APP.lang = lang;
                 applyLang();
                 showScreen('screen-auth');
+                // No AI Agent on Auth screen by default, but it's initialized if needed
+                AI_AGENT.init(false); 
             } else {
                 showScreen('screen-lang');
+                AI_AGENT.init(true); // init and show for language selection
             }
 
             updateGreeting();
@@ -2741,6 +2744,7 @@
         }
 
         function startDashboard() {
+            AI_AGENT.hide(); // Safety: hide AI on dashboard
             populateApp();
             loadRides();
             subscribeRealtime();
@@ -3797,12 +3801,14 @@
                 Marathi: 'mr-IN'
             },
 
-            init() {
+            init(shouldSpeak = true) {
                 this.video = document.getElementById('ai-video');
-                this.show();
-                this.video.play().catch(() => {});
-                // Speak the language-selection prompt
-                setTimeout(() => this.speak('lang'), 800);
+                if (shouldSpeak) {
+                    this.show();
+                    this.video.play().catch(() => {});
+                    // Speak the language-selection prompt
+                    setTimeout(() => this.speak('lang'), 800);
+                }
             },
 
             show() {
@@ -3871,12 +3877,12 @@
 
                 if (step === 'driver') {
                     this.highlight('inp-name');
-                    this.highlightTimers.push(setTimeout(() => this.highlight('inp-mobile'),  4500));
+                    this.highlightTimers.push(setTimeout(() => this.highlight('inp-mobile'),  5000));
                     this.highlightTimers.push(setTimeout(() => this.highlight('inp-addr1'),   9000));
-                    this.highlightTimers.push(setTimeout(() => this.clearHighlights(),       13500));
+                    this.highlightTimers.push(setTimeout(() => this.clearHighlights(),       13000));
                 } else if (step === 'auto') {
                     this.highlight('inp-vnum');
-                    this.highlightTimers.push(setTimeout(() => this.highlight('inp-vmake'),   4500));
+                    this.highlightTimers.push(setTimeout(() => this.highlight('inp-vmake'),   5000));
                     this.highlightTimers.push(setTimeout(() => this.clearHighlights(),        9000));
                 }
             }
@@ -3891,8 +3897,6 @@
 
         // Voices load async — re-trigger init speech if needed
         window.speechSynthesis.onvoiceschanged = () => {};
-
-        window.addEventListener('DOMContentLoaded', () => AI_AGENT.init());
     </script>
 </body>
 </html>
