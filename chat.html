@@ -257,20 +257,26 @@
 
     // ── Subscribe to new incoming messages (realtime) ─────────
     function subscribeNewMessages() {
-      _supabase.channel('driver-inbox')
+      // Unify channel name to match passenger side for instant sync
+      _supabase.channel('safarr-chat-sync')
         .on('postgres_changes', {
-          event: 'INSERT', schema: 'public', table: 'safarr_messages',
-          filter: `receiver_id=eq.${DRIVER_ID}`
+          event: 'INSERT', schema: 'public', table: 'safarr_messages'
         }, (payload) => {
-          loadConversations(); // refresh list
-          if (activePassenger && payload.new.sender_id === activePassenger.id) {
-            if (!document.getElementById('msg-' + payload.new.id)) {
-              appendMessage(payload.new);
+          const m = payload.new;
+          // 1. Refresh the sidebar list for all new messages involving me
+          if (m.receiver_id === DRIVER_ID || m.sender_id === DRIVER_ID) {
+            loadConversations();
+          }
+          // 2. If this message is for the currently open chat, show it instantly
+          if (activePassenger && 
+             ((m.sender_id === activePassenger.id && m.receiver_id === DRIVER_ID) || 
+              (m.sender_id === DRIVER_ID && m.receiver_id === activePassenger.id))) {
+            if (!document.getElementById('msg-' + m.id)) {
+              appendMessage(m);
               scrollBottom();
             }
           }
-        })
-        .subscribe();
+        }).subscribe();
     }
 
     // ── Open individual chat ───────────────────────────────────
@@ -357,11 +363,13 @@
 
     function speakText(text) {
       if (!text) return;
+      window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       const myLang = document.getElementById('driver-lang').value;
       if (myLang === 'Hindi') utterance.lang = 'hi-IN';
       else if (myLang === 'Marathi') utterance.lang = 'mr-IN';
       else utterance.lang = 'en-IN';
+      utterance.rate = 0.9;
       window.speechSynthesis.speak(utterance);
     }
 
