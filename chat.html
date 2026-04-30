@@ -488,29 +488,36 @@
     let currentAudio = null;
     let activePlayBtn = null;
 
-    function playVoice(url, btn, transText) {
-      const isSent = btn.closest('.msg-row').classList.contains('sent');
-      const playIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
-      const pauseIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+    function playVoice(u, b, transText) {
+      const isSent = b.closest('.msg-row').classList.contains('sent');
+      const playIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+      const pauseIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
 
-      // NEW LOGIC: If I am receiver and translation exists, ONLY play AI voice
-      if (!isSent && transText) {
-        speakText(transText);
-        btn.innerHTML = pauseIcon;
-        setTimeout(() => { btn.innerHTML = playIcon; }, 4000); 
-        return;
+      // RECEIVER LOGIC: AI Voice with Original Fallback
+      if (activePassenger && !isSent && transText) {
+        try {
+          speakText(transText);
+          b.innerHTML = pauseIcon;
+          setTimeout(() => { b.innerHTML = playIcon; }, 4000);
+          
+          if (activePlayBtn === b) { 
+             window.speechSynthesis.cancel();
+          } else {
+             activePlayBtn = b;
+             return; 
+          }
+        } catch (e) { console.warn('AI Speech failed, falling back to original'); }
       }
 
-      // Default: Play original audio
       if (currentAudio && activePlayBtn) {
-        if (currentAudio.src === url) {
+        if (currentAudio.src === u) {
           if (!currentAudio.paused) {
             currentAudio.pause();
-            btn.innerHTML = playIcon;
+            b.innerHTML = playIcon;
             return;
           } else {
             currentAudio.play();
-            btn.innerHTML = pauseIcon;
+            b.innerHTML = pauseIcon;
             return;
           }
         } else {
@@ -519,10 +526,13 @@
         }
       }
 
-      currentAudio = new Audio(url);
-      activePlayBtn = btn;
-      currentAudio.play();
-      btn.innerHTML = pauseIcon;
+      currentAudio = new Audio(u);
+      activePlayBtn = b;
+      currentAudio.play().catch(e => {
+        console.error('Audio playback failed:', e);
+        showToast('Playback failed');
+      });
+      b.innerHTML = pauseIcon;
 
       currentAudio.onended = () => {
         btn.innerHTML = playIcon;
