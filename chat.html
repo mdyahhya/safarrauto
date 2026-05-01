@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -7,105 +8,526 @@
   <title>Safarr Driver – Chat</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;700&display=swap"
+    rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
-    :root{--primary:#0050ff;--navy:#0a1628;--white:#fff;--off-white:#f8f9fc;--gray:#8a9ab5;--gray-light:#eff2f6;--success:#00c853;--danger:#ff3d00}
-    *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-    body{font-family:'DM Sans',sans-serif;background:var(--off-white);height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+    :root {
+      --primary: #0050ff;
+      --navy: #0a1628;
+      --white: #fff;
+      --off-white: #f8f9fc;
+      --gray: #8a9ab5;
+      --gray-light: #eff2f6;
+      --success: #00c853;
+      --danger: #ff3d00
+    }
 
-    .chat-header{background:var(--navy);padding:50px 20px 16px;display:flex;align-items:center;gap:14px;flex-shrink:0}
-    .back-btn{width:40px;height:40px;border-radius:14px;background:rgba(255,255,255,.1);border:none;font-size:1.2rem;display:flex;align-items:center;justify-content:center;cursor:pointer;text-decoration:none;color:#fff;flex-shrink:0}
-    .driver-avatar{width:46px;height:46px;border-radius:16px;object-fit:cover;border:2px solid rgba(255,255,255,.3);flex-shrink:0}
-    .driver-info{flex:1}
-    .driver-chat-name{font-family:'Syne',sans-serif;font-weight:800;font-size:1.05rem;color:#fff}
-    .driver-chat-meta{font-size:.78rem;color:rgba(255,255,255,.5)}
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent
+    }
 
-    /* Conversations list */
-    .conv-list{flex:1;overflow-y:auto;padding:16px}
-    .conv-card{background:var(--white);border-radius:20px;padding:16px;margin-bottom:12px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 12px rgba(0,0,0,.06);cursor:pointer;border:2px solid transparent;transition:all .2s}
-    .conv-card:active,.conv-card.selected{border-color:var(--primary);background:#f0f5ff}
-    .conv-avatar{width:52px;height:52px;border-radius:18px;object-fit:cover;flex-shrink:0;border:2px solid var(--gray-light)}
-    .conv-info{flex:1;min-width:0}
-    .conv-name{font-weight:800;font-size:.95rem;margin-bottom:3px}
-    .conv-preview{font-size:.8rem;color:var(--gray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .conv-time{font-size:.7rem;color:var(--gray);flex-shrink:0}
-    .conv-unread{background:var(--primary);color:#fff;font-size:.68rem;font-weight:800;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--off-white);
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden
+    }
 
-    /* Active chat panel */
-    .chat-panel{position:fixed;inset:0;background:var(--off-white);display:none;flex-direction:column;z-index:100}
-    .chat-panel.open{display:flex}
-    .panel-header{background:var(--white);padding:50px 20px 16px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--gray-light);flex-shrink:0}
-    .close-chat{width:40px;height:40px;border-radius:14px;background:var(--off-white);border:none;font-size:1.2rem;cursor:pointer;flex-shrink:0}
-    .panel-avatar{width:46px;height:46px;border-radius:16px;object-fit:cover;flex-shrink:0}
-    .panel-name{font-family:'Syne',sans-serif;font-weight:800;font-size:1.05rem}
-    .panel-status{font-size:.78rem;color:var(--success);font-weight:600}
-    .panel-call{width:42px;height:42px;background:var(--success);border-radius:14px;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;color:#fff;text-decoration:none;flex-shrink:0}
+    .chat-header {
+      background: var(--navy);
+      padding: 50px 20px 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0
+    }
 
-    .messages-feed{flex:1;overflow-y:auto;padding:20px 16px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth}
-    .msg-row{display:flex;align-items:flex-end;gap:8px}
-    .msg-row.sent{flex-direction:row-reverse}
-    .msg-avatar{width:32px;height:32px;border-radius:10px;object-fit:cover;flex-shrink:0}
-    .msg-bubble{max-width:72%;padding:12px 16px;border-radius:20px;font-size:.93rem;line-height:1.5}
-    .msg-row.received .msg-bubble{background:var(--white);border-radius:4px 20px 20px 20px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
-    .msg-row.sent .msg-bubble{background:var(--primary);color:#fff;border-radius:20px 4px 20px 20px}
-    .msg-time{font-size:.68rem;opacity:.55;margin-top:4px;display:block}
-    .msg-row.sent .msg-time{text-align:right}
+    .back-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, .1);
+      border: none;
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      text-decoration: none;
+      color: #fff;
+      flex-shrink: 0
+    }
 
-    /* Voice bubble */
-    .voice-bubble{display:flex;align-items:center;gap:10px;min-width:160px}
-    .voice-play{width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
-    .msg-row.sent .voice-play{background:rgba(255,255,255,.25);color:#fff}
-    .msg-row.received .voice-play{background:var(--primary);color:#fff}
+    .driver-avatar {
+      width: 46px;
+      height: 46px;
+      border-radius: 16px;
+      object-fit: cover;
+      border: 2px solid rgba(255, 255, 255, .3);
+      flex-shrink: 0
+    }
 
-    .chat-input-bar{background:var(--white);padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--gray-light);display:flex;align-items:flex-end;gap:10px;flex-shrink:0}
-    .msg-input{flex:1;background:var(--off-white);border:2px solid var(--gray-light);border-radius:22px;padding:12px 18px;font-size:.95rem;font-family:'DM Sans',sans-serif;resize:none;max-height:100px;outline:none;transition:border-color .2s}
-    .msg-input:focus{border-color:var(--primary)}
-    .icon-btn{width:46px;height:46px;border-radius:16px;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
-    .send-btn{background:var(--primary);color:#fff}
-    .voice-btn{background:var(--off-white);color:var(--navy)}
-    .voice-btn.recording{background:var(--danger);color:#fff;animation:pulse 1s ease infinite}
-    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,61,0,.4)}50%{box-shadow:0 0 0 10px rgba(255,61,0,0)}}
+    .driver-info {
+      flex: 1
+    }
 
-    /* Translation Styles */
+    .driver-chat-name {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.05rem;
+      color: #fff
+    }
+
+    .driver-chat-meta {
+      font-size: .78rem;
+      color: rgba(255, 255, 255, .5)
+    }
+
+    .conv-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px
+    }
+
+    .conv-card {
+      background: var(--white);
+      border-radius: 20px;
+      padding: 16px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, .06);
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all .2s
+    }
+
+    .conv-card:active,
+    .conv-card.selected {
+      border-color: var(--primary);
+      background: #f0f5ff
+    }
+
+    .conv-avatar {
+      width: 52px;
+      height: 52px;
+      border-radius: 18px;
+      object-fit: cover;
+      flex-shrink: 0;
+      border: 2px solid var(--gray-light)
+    }
+
+    .conv-info {
+      flex: 1;
+      min-width: 0
+    }
+
+    .conv-name {
+      font-weight: 800;
+      font-size: .95rem;
+      margin-bottom: 3px
+    }
+
+    .conv-preview {
+      font-size: .8rem;
+      color: var(--gray);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+
+    .conv-time {
+      font-size: .7rem;
+      color: var(--gray);
+      flex-shrink: 0
+    }
+
+    .conv-unread {
+      background: var(--primary);
+      color: #fff;
+      font-size: .68rem;
+      font-weight: 800;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0
+    }
+
+    .chat-panel {
+      position: fixed;
+      inset: 0;
+      background: var(--off-white);
+      display: none;
+      flex-direction: column;
+      z-index: 100
+    }
+
+    .chat-panel.open {
+      display: flex
+    }
+
+    .panel-header {
+      background: var(--white);
+      padding: 50px 20px 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border-bottom: 1px solid var(--gray-light);
+      flex-shrink: 0
+    }
+
+    .close-chat {
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      background: var(--off-white);
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+      flex-shrink: 0
+    }
+
+    .panel-avatar {
+      width: 46px;
+      height: 46px;
+      border-radius: 16px;
+      object-fit: cover;
+      flex-shrink: 0
+    }
+
+    .panel-name {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.05rem
+    }
+
+    .panel-status {
+      font-size: .78rem;
+      color: var(--success);
+      font-weight: 600
+    }
+
+    .panel-call {
+      width: 42px;
+      height: 42px;
+      background: var(--success);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      cursor: pointer;
+      color: #fff;
+      text-decoration: none;
+      flex-shrink: 0
+    }
+
+    .messages-feed {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scroll-behavior: smooth
+    }
+
+    .msg-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px
+    }
+
+    .msg-row.sent {
+      flex-direction: row-reverse
+    }
+
+    .msg-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      object-fit: cover;
+      flex-shrink: 0
+    }
+
+    .msg-bubble {
+      max-width: 72%;
+      padding: 12px 16px;
+      border-radius: 20px;
+      font-size: .93rem;
+      line-height: 1.5
+    }
+
+    .msg-row.received .msg-bubble {
+      background: var(--white);
+      border-radius: 4px 20px 20px 20px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .06)
+    }
+
+    .msg-row.sent .msg-bubble {
+      background: var(--primary);
+      color: #fff;
+      border-radius: 20px 4px 20px 20px
+    }
+
+    .msg-time {
+      font-size: .68rem;
+      opacity: .55;
+      margin-top: 4px;
+      display: block
+    }
+
+    .msg-row.sent .msg-time {
+      text-align: right
+    }
+
+    .voice-bubble {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 160px
+    }
+
+    .voice-play {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform .1s
+    }
+
+    .voice-play:active {
+      transform: scale(.92)
+    }
+
+    .msg-row.sent .voice-play {
+      background: rgba(255, 255, 255, .25);
+      color: #fff
+    }
+
+    .msg-row.received .voice-play {
+      background: var(--primary);
+      color: #fff
+    }
+
+    .chat-input-bar {
+      background: var(--white);
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+      border-top: 1px solid var(--gray-light);
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      flex-shrink: 0
+    }
+
+    .msg-input {
+      flex: 1;
+      background: var(--off-white);
+      border: 2px solid var(--gray-light);
+      border-radius: 22px;
+      padding: 12px 18px;
+      font-size: .95rem;
+      font-family: 'DM Sans', sans-serif;
+      resize: none;
+      max-height: 100px;
+      outline: none;
+      transition: border-color .2s
+    }
+
+    .msg-input:focus {
+      border-color: var(--primary)
+    }
+
+    .icon-btn {
+      width: 46px;
+      height: 46px;
+      border-radius: 16px;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: transform .1s
+    }
+
+    .icon-btn:active {
+      transform: scale(.93)
+    }
+
+    .send-btn {
+      background: var(--primary);
+      color: #fff
+    }
+
+    .voice-btn {
+      background: var(--off-white);
+      color: var(--navy)
+    }
+
+    .voice-btn.recording {
+      background: var(--danger);
+      color: #fff;
+      animation: pulse 1s ease infinite
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(255, 61, 0, .4)
+      }
+
+      50% {
+        box-shadow: 0 0 0 10px rgba(255, 61, 0, 0)
+      }
+    }
+
     .lang-selector {
-      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 10px;
-      padding: 4px 8px; font-size: .75rem; font-weight: 700; color: #fff; outline: none;
-      cursor: pointer; font-family: inherit; margin-right: 5px;
+      background: rgba(255, 255, 255, .1);
+      border: 1px solid rgba(255, 255, 255, .2);
+      border-radius: 10px;
+      padding: 4px 8px;
+      font-size: .75rem;
+      font-weight: 700;
+      color: #fff;
+      outline: none;
+      cursor: pointer;
+      font-family: inherit;
+      margin-right: 5px
     }
-    .chat-panel .lang-selector { color: var(--navy); background: var(--off-white); border-color: var(--gray-light); }
+
+    .chat-panel .lang-selector {
+      color: var(--navy);
+      background: var(--off-white);
+      border-color: var(--gray-light)
+    }
+
     .translation-card {
-      margin-top: 8px; padding: 10px; background: rgba(0,80,255,0.05); border-radius: 12px;
-      font-size: .85rem; color: var(--navy); border-left: 3px solid var(--primary);
-      display: flex; align-items: flex-start; gap: 8px;
+      margin-top: 8px;
+      padding: 10px;
+      background: rgba(0, 80, 255, .05);
+      border-radius: 12px;
+      font-size: .85rem;
+      color: var(--navy);
+      border-left: 3px solid var(--primary);
+      display: flex;
+      align-items: flex-start;
+      gap: 8px
     }
-    .sent .translation-card { background: rgba(255,255,255,0.15); color: #fff; border-left-color: #fff; }
+
+    .sent .translation-card {
+      background: rgba(255, 255, 255, .15);
+      color: #fff;
+      border-left-color: #fff
+    }
+
     .speak-btn {
-      background: none; border: none; color: inherit; cursor: pointer; opacity: 0.7; padding: 2px;
+      background: none;
+      border: none;
+      color: inherit;
+      cursor: pointer;
+      opacity: .7;
+      padding: 2px;
+      flex-shrink: 0
     }
-    .speak-btn:hover { opacity: 1; }
 
-    .rec-bar{background:var(--danger);color:#fff;padding:10px 20px;text-align:center;font-weight:700;font-size:.85rem;display:none;align-items:center;gap:8px;justify-content:center;flex-shrink:0}
-    .rec-dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:blink 1s ease infinite}
-    @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+    .speak-btn:hover {
+      opacity: 1
+    }
 
-    .empty-conv{padding:60px 24px;text-align:center;color:var(--gray)}
-    .empty-conv-icon{font-size:3rem;margin-bottom:12px}
-    .messages-feed::-webkit-scrollbar{width:0}
+    /* System message for language change */
+    .sys-msg {
+      text-align: center;
+      font-size: .75rem;
+      color: var(--gray);
+      padding: 6px 16px;
+      background: var(--gray-light);
+      border-radius: 20px;
+      margin: 4px auto;
+      max-width: 280px
+    }
+
+    .rec-bar {
+      background: var(--danger);
+      color: #fff;
+      padding: 10px 20px;
+      text-align: center;
+      font-weight: 700;
+      font-size: .85rem;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
+      flex-shrink: 0
+    }
+
+    .rec-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #fff;
+      animation: blink 1s ease infinite
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .2
+      }
+    }
+
+    .empty-conv {
+      padding: 60px 24px;
+      text-align: center;
+      color: var(--gray)
+    }
+
+    .empty-conv-icon {
+      font-size: 3rem;
+      margin-bottom: 12px
+    }
+
+    .messages-feed::-webkit-scrollbar {
+      width: 0
+    }
   </style>
 </head>
+
 <body>
 
-  <!-- Conversations Header -->
   <div class="chat-header">
     <a class="back-btn" href="index.html">←</a>
     <div style="flex:1">
       <div class="driver-chat-name">Passenger Messages</div>
       <div class="driver-chat-meta" id="conv-count">Loading...</div>
     </div>
+    <select class="lang-selector" id="driver-lang" onchange="updateDriverLang()">
+      <option value="English">EN</option>
+      <option value="Hindi">HI</option>
+      <option value="Marathi">MR</option>
+    </select>
   </div>
 
-  <!-- Conversations List -->
   <div class="conv-list" id="conv-list">
     <div class="empty-conv">
       <div class="empty-conv-icon">💬</div>
@@ -114,37 +536,42 @@
     </div>
   </div>
 
-  <!-- Active Chat Panel (slides in from right) -->
   <div class="chat-panel" id="chat-panel">
     <div class="panel-header">
       <button class="close-chat" onclick="closeChatPanel()">←</button>
-      <img class="panel-avatar" id="panel-avatar" src="https://ui-avatars.com/api/?name=User&background=0050ff&color=fff">
+      <img class="panel-avatar" id="panel-avatar"
+        src="https://ui-avatars.com/api/?name=User&background=0050ff&color=fff">
       <div style="flex:1">
         <div class="panel-name" id="panel-name">Passenger</div>
         <div class="panel-status">● Active now</div>
       </div>
-      <select class="lang-selector" id="driver-lang" onchange="updateDriverLang()">
-        <option value="English">English</option>
-        <option value="Hindi">Hindi</option>
-        <option value="Marathi">Marathi</option>
-      </select>
       <a class="panel-call" id="panel-call" href="tel:">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.07 12 19.79 19.79 0 0 1 1 3.18 2 2 0 0 1 2.96 1h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.71 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.58 2.81.71A2 2 0 0 1 22 16.92z"/></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path
+            d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.07 12 19.79 19.79 0 0 1 1 3.18 2 2 0 0 1 2.96 1h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.71 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.58 2.81.71A2 2 0 0 1 22 16.92z" />
+        </svg>
       </a>
     </div>
 
-    <div class="rec-bar" id="rec-bar"><div class="rec-dot"></div> Recording...</div>
-
+    <div class="rec-bar" id="rec-bar">
+      <div class="rec-dot"></div> Recording...
+    </div>
     <div class="messages-feed" id="messages-feed"></div>
 
     <div class="chat-input-bar">
       <button class="icon-btn voice-btn" id="voice-btn" onclick="toggleRecording()">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3M8 22h8"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3M8 22h8" />
+        </svg>
       </button>
-      <textarea class="msg-input" id="msg-input" placeholder="Type a reply..." rows="1"
-                oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
+      <textarea class="msg-input" id="msg-input" placeholder="Type a reply..." rows="1" oninput="autoResize(this)"
+        onkeydown="handleKey(event)"></textarea>
       <button class="icon-btn send-btn" onclick="sendMessage()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="22" y1="2" x2="11" y2="13" />
+          <polygon points="22 2 15 22 11 13 2 9 22 2" />
+        </svg>
       </button>
     </div>
   </div>
@@ -154,72 +581,82 @@
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvdXFqa3ZmYmplZmJ5aW5kcWpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMTM2NjAsImV4cCI6MjA5MjY4OTY2MH0.yivlkQjKt4r6Lx507BsuM48t9aIM-7OBJOx91_6XEfw';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    const DRIVER_ID   = '129480db-3d9a-4a5d-97e4-948b4c2c62b9';
+    const DRIVER_ID = '129480db-3d9a-4a5d-97e4-948b4c2c62b9';
     const DRIVER_NAME = 'Rakesh Kumar';
-    const DRIVER_IMG  = 'https://eouqjkvfbjefbyindqjp.supabase.co/storage/v1/object/public/driver-profiles/129480db-3d9a-4a5d-97e4-948b4c2c62b9/profile.jpg';
+    const DRIVER_IMG = 'https://eouqjkvfbjefbyindqjp.supabase.co/storage/v1/object/public/driver-profiles/129480db-3d9a-4a5d-97e4-948b4c2c62b9/profile.jpg';
 
-    let activePassenger = null; // { id, name, mobile, avatar }
-    let realtimeChannel = null;
+    let activePassenger = null;
     let mediaRecorder = null;
     let recordingChunks = [];
     let isRecording = false;
+    let passengerLang = 'English';
+    let recordingStart = null;
 
+    // ── Shared play state ────────────────────────────────────────────────────
+    let currentAudio = null;
+    let activePlayBtn = null;
+    let activeSpeechBtn = null; // tracks which button triggered speechSynthesis
+
+    // ── Icons ────────────────────────────────────────────────────────────────
+    const PLAY_ICON = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+    const PAUSE_ICON = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+
+    // ── Init ─────────────────────────────────────────────────────────────────
     window.onload = async () => {
-      // PERMANENT FIX: Always fetch latest lang from DB on load
+      // Always fetch latest language from DB
       try {
-        const { data, error } = await _supabase.from('auto_drivers').select('language').eq('id', DRIVER_ID).single();
-        if (!error && data) {
-          let dbLang = data.language || 'English';
-          // Normalize to Capitalized (e.g., 'hindi' -> 'Hindi')
-          dbLang = dbLang.charAt(0).toUpperCase() + dbLang.slice(1).toLowerCase();
-          
-          const el = document.getElementById('driver-lang');
-          if (el) el.value = dbLang;
+        const { data } = await _supabase
+          .from('auto_drivers').select('language').eq('id', DRIVER_ID).single();
+        if (data?.language) {
+          const lang = normalizeLang(data.language);
+          document.getElementById('driver-lang').value = lang;
         }
-      } catch (e) { console.warn('Sync driver lang failed:', e); }
+      } catch (e) { console.warn('Lang sync failed:', e); }
 
-      // Check if opened directly to a specific passenger (from ride popup)
       const params = new URLSearchParams(window.location.search);
-      const uid   = params.get('uid');
-      const name  = params.get('name');
-      const mob   = params.get('mobile');
-      const img   = params.get('img');
+      const uid = params.get('uid');
+      const name = params.get('name');
+      const mob = params.get('mobile');
+      const img = params.get('img');
 
       await loadConversations();
       subscribeNewMessages();
 
-      if (uid && name) {
-        // Auto-open that passenger's chat
-        openChat(uid, name, mob || '', img || '');
-      }
+      if (uid && name) openChat(uid, name, mob || '', img || '');
     };
 
+    // Normalize any lang value to full capitalized word
+    function normalizeLang(val) {
+      if (!val) return 'English';
+      const map = {
+        en: 'English', hi: 'Hindi', mr: 'Marathi',
+        english: 'English', hindi: 'Hindi', marathi: 'Marathi'
+      };
+      return map[val.toLowerCase()] || (val.charAt(0).toUpperCase() + val.slice(1));
+    }
+
+    // ── Language update ──────────────────────────────────────────────────────
     async function updateDriverLang() {
+      const lang = document.getElementById('driver-lang').value;
       try {
-        const lang = document.getElementById('driver-lang').value;
-        // Try 1: Capitalized (like User panel)
-        let { error } = await _supabase.from('auto_drivers').update({ language: lang }).eq('id', DRIVER_ID);
-        
-        if (error) {
-          console.warn('Capitalized update failed, trying lowercase...', error.message);
-          // Try 2: Lowercase (Database might be case-sensitive)
-          let { error: err2 } = await _supabase.from('auto_drivers').update({ language: lang.toLowerCase() }).eq('id', DRIVER_ID);
-          if (err2) throw err2;
-        }
-        
+        const { error } = await _supabase
+          .from('auto_drivers').update({ language: lang }).eq('id', DRIVER_ID);
+        if (error) throw error;
         showToast('Language set to ' + lang);
+        // Post system message in active chat
+        if (activePassenger) appendSysMsg(`You switched language to ${lang}`);
       } catch (e) {
-        console.error('Update driver lang error:', e);
+        console.error('Update lang error:', e);
         showToast('Error saving language');
       }
     }
 
-    // ── Load unique passengers who messaged the driver ──────────
+    // ── Load conversations list ──────────────────────────────────────────────
     async function loadConversations() {
       const { data, error } = await _supabase
         .from('safarr_messages')
         .select('*')
-        .eq('receiver_id', DRIVER_ID)
+        .or(`sender_id.eq.${DRIVER_ID},receiver_id.eq.${DRIVER_ID}`)
         .order('created_at', { ascending: false });
 
       if (error || !data?.length) {
@@ -227,32 +664,39 @@
         return;
       }
 
-      // Group by sender
+      // Group by the OTHER party (not the driver)
       const seen = {};
       data.forEach(m => {
-        if (!seen[m.sender_id]) seen[m.sender_id] = m;
+        const otherId = m.sender_id === DRIVER_ID ? m.receiver_id : m.sender_id;
+        if (!seen[otherId]) seen[otherId] = m;
       });
 
       const convs = Object.values(seen);
-      
-      // Fetch profile images for these senders
-      const senderIds = convs.map(c => c.sender_id);
-      const { data: userData } = await _supabase.from('safarr_users').select('id, profile_image_url').in('id', senderIds);
-      const userMap = {};
-      
-      if (userData) {
-        userData.forEach(u => { userMap[u.id] = u.profile_image_url; });
-      }
+      const otherIds = convs.map(c => c.sender_id === DRIVER_ID ? c.receiver_id : c.sender_id);
 
-      document.getElementById('conv-count').textContent = convs.length + ' conversation' + (convs.length !== 1 ? 's' : '');
+      // Fetch avatars
+      const { data: userData } = await _supabase
+        .from('safarr_users').select('id,profile_image_url').in('id', otherIds);
+      const userMap = {};
+      if (userData) userData.forEach(u => { userMap[u.id] = u.profile_image_url; });
+
+      document.getElementById('conv-count').textContent =
+        convs.length + ' conversation' + (convs.length !== 1 ? 's' : '');
 
       document.getElementById('conv-list').innerHTML = convs.map(m => {
-        const pImg = userMap[m.sender_id] || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.sender_name||'U')}&background=0050ff&color=fff`;
+        const otherId = m.sender_id === DRIVER_ID ? m.receiver_id : m.sender_id;
+        const otherName = m.sender_id === DRIVER_ID
+          ? (m.receiver_name || 'Passenger')
+          : (m.sender_name || 'Passenger');
+        const pImg = userMap[otherId] ||
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(otherName)}&background=0050ff&color=fff`;
+
         return `
-        <div class="conv-card" onclick="openChat('${m.sender_id}','${escHtml(m.sender_name || 'Passenger')}','','${pImg}')">
-          <img class="conv-avatar" src="${pImg}" onerror="this.src='https://ui-avatars.com/api/?name=U&background=0050ff&color=fff'">
+        <div class="conv-card" onclick="openChat('${otherId}','${escHtml(otherName)}','','${pImg}')">
+          <img class="conv-avatar" src="${pImg}"
+               onerror="this.src='https://ui-avatars.com/api/?name=U&background=0050ff&color=fff'">
           <div class="conv-info">
-            <div class="conv-name">${escHtml(m.sender_name || 'Passenger')}</div>
+            <div class="conv-name">${escHtml(otherName)}</div>
             <div class="conv-preview">${escHtml(m.message_type === 'voice' ? '🎤 Voice message' : m.message || '')}</div>
           </div>
           <div class="conv-time">${timeFmt(m.created_at)}</div>
@@ -260,96 +704,99 @@
       }).join('');
     }
 
-    // ── Subscribe to new incoming messages (realtime) ─────────
+    // ── Realtime subscription ────────────────────────────────────────────────
     function subscribeNewMessages() {
-      // Unify channel name to match passenger side for instant sync
-      _supabase.channel('safarr-chat-sync')
+      _supabase.channel('driver-chat-' + DRIVER_ID)
         .on('postgres_changes', {
-          event: 'INSERT', schema: 'public', table: 'safarr_messages'
+          event: 'INSERT', schema: 'public', table: 'safarr_messages',
+          filter: `receiver_id=eq.${DRIVER_ID}`
         }, (payload) => {
           const m = payload.new;
-          // 1. Refresh the sidebar list for all new messages involving me
-          if (m.receiver_id === DRIVER_ID || m.sender_id === DRIVER_ID) {
-            loadConversations();
-          }
-          // 2. If this message is for the currently open chat, show it instantly
-          if (activePassenger && 
-             ((m.sender_id === activePassenger.id && m.receiver_id === DRIVER_ID) || 
-              (m.sender_id === DRIVER_ID && m.receiver_id === activePassenger.id))) {
-            if (!document.getElementById('msg-' + m.id)) {
-              appendMessage(m);
-              scrollBottom();
-            }
+          loadConversations();
+          if (activePassenger && m.sender_id === activePassenger.id &&
+            !document.getElementById('msg-' + m.id)) {
+            appendMessage(m);
+            scrollBottom();
           }
         }).subscribe();
     }
 
-    // ── Open individual chat ───────────────────────────────────
+    // ── Open chat panel ──────────────────────────────────────────────────────
     async function openChat(passengerId, name, mobile, avatar) {
       activePassenger = { id: passengerId, name, mobile, avatar };
       document.getElementById('panel-name').textContent = name;
       document.getElementById('panel-call').href = mobile ? 'tel:' + mobile : 'tel:';
-      document.getElementById('panel-avatar').src = avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0050ff&color=fff`;
+      document.getElementById('panel-avatar').src = avatar ||
+        `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0050ff&color=fff`;
       document.getElementById('messages-feed').innerHTML = '';
       document.getElementById('chat-panel').classList.add('open');
 
-      // Fetch passenger's preferred language
-      fetchPassengerLang(passengerId);
+      await fetchPassengerLang(passengerId);
 
-      // Load messages for this passenger
+      // FIX: filter messages correctly — only between driver and THIS passenger
       const { data } = await _supabase
         .from('safarr_messages')
         .select('*')
-        .or(`sender_id.eq.${passengerId},receiver_id.eq.${passengerId}`)
+        .or(
+          `and(sender_id.eq.${DRIVER_ID},receiver_id.eq.${passengerId}),` +
+          `and(sender_id.eq.${passengerId},receiver_id.eq.${DRIVER_ID})`
+        )
         .order('created_at', { ascending: true });
 
       if (data?.length) data.forEach(appendMessage);
       scrollBottom();
     }
 
-    let passengerLang = 'English';
     async function fetchPassengerLang(uid) {
       try {
-        const { data, error } = await _supabase.from('safarr_users').select('preferred_language').eq('id', uid).single();
-        if (!error && data) passengerLang = data.preferred_language || 'English';
+        const { data } = await _supabase
+          .from('safarr_users').select('preferred_language').eq('id', uid).single();
+        if (data?.preferred_language) passengerLang = normalizeLang(data.preferred_language);
       } catch (e) { console.warn('Passenger lang fetch failed:', e); }
     }
 
-    // Open chat from ride card (called with full ride data)
-    function openChatFromRide(passengerId, name, mobile, avatarUrl) {
-      openChat(passengerId, name, mobile, avatarUrl);
-    }
-
     function closeChatPanel() {
+      stopSpeech();
+      stopAudio();
       document.getElementById('chat-panel').classList.remove('open');
       activePassenger = null;
     }
 
-    // ── Render a message bubble ────────────────────────────────
+    // ── Render message ───────────────────────────────────────────────────────
     function appendMessage(msg) {
       const feed = document.getElementById('messages-feed');
       const isSent = msg.sender_id === DRIVER_ID;
-      const time = new Date(msg.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+      const time = new Date(msg.created_at).toLocaleTimeString('en-IN',
+        { hour: '2-digit', minute: '2-digit' });
 
       let bubbleHtml = '';
       if (msg.message_type === 'voice' && msg.voice_url) {
+        const safeUrl = msg.voice_url.replace(/'/g, '%27');
+        const safeTxt = msg.translated_text
+          ? msg.translated_text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, ' ')
+          : '';
+
         bubbleHtml = `<div class="voice-bubble">
-          <button class="voice-play" onclick="playVoice('${msg.voice_url}',this,'${msg.translated_text ? msg.translated_text.replace(/'/g, "\\'") : ''}')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <button class="voice-play" onclick="playVoice('${safeUrl}',this,'${safeTxt}')">
+            ${PLAY_ICON}
           </button>
           <div style="flex:1;height:20px;background:${isSent ? 'rgba(255,255,255,.3)' : 'rgba(0,80,255,.15)'};border-radius:10px"></div>
           <span style="font-size:.72rem;opacity:.7">${msg.voice_duration || '0:05'}</span>
         </div>`;
 
+        // Show translation card only for received messages with translation
         if (!isSent && msg.translated_text) {
           bubbleHtml += `
             <div class="translation-card">
-              <button class="speak-btn" onclick="speakText('${msg.translated_text.replace(/'/g, "\\'")}')">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+              <button class="speak-btn" onclick="speakText('${safeTxt}',this)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                </svg>
               </button>
               <div>
-                <div style="font-size:0.6rem; opacity:0.6; margin-bottom:2px">AI TRANSLATED</div>
-                ${msg.translated_text}
+                <div style="font-size:0.6rem;opacity:0.6;margin-bottom:2px">AI TRANSLATED</div>
+                ${escHtml(msg.translated_text)}
               </div>
             </div>`;
         }
@@ -361,24 +808,132 @@
       row.className = `msg-row ${isSent ? 'sent' : 'received'}`;
       row.id = 'msg-' + msg.id;
       row.innerHTML = `
-        ${!isSent ? `<img class="msg-avatar" src="${activePassenger?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(activePassenger?.name||'U')}&background=0050ff&color=fff`}">` : ''}
-        <div class="msg-bubble">${bubbleHtml}<span class="msg-time">${time}${isSent ? ' ✓' : ''}</span></div>`;
+        ${!isSent ? `<img class="msg-avatar"
+          src="${activePassenger?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(activePassenger?.name || 'U')}&background=0050ff&color=fff`}"
+          onerror="this.src='https://ui-avatars.com/api/?name=U&background=0050ff&color=fff'">` : ''}
+        <div class="msg-bubble">
+          ${bubbleHtml}
+          <span class="msg-time">${time}${isSent ? ' ✓' : ''}</span>
+        </div>`;
       feed.appendChild(row);
     }
 
-    function speakText(text) {
+    function appendSysMsg(text) {
+      const feed = document.getElementById('messages-feed');
+      const el = document.createElement('div');
+      el.className = 'sys-msg';
+      el.textContent = text;
+      feed.appendChild(el);
+      scrollBottom();
+    }
+
+    // ── FIXED playVoice ──────────────────────────────────────────────────────
+    function playVoice(url, btn, transText) {
+      const isSent = btn.closest('.msg-row').classList.contains('sent');
+
+      // RECEIVER with translation: use Speech API
+      if (!isSent && transText && transText.trim()) {
+        // If this button is already the active speech button → stop
+        if (activeSpeechBtn === btn) {
+          stopSpeech();
+          return;
+        }
+        // Stop any other audio/speech first
+        stopSpeech();
+        stopAudio();
+
+        activeSpeechBtn = btn;
+        btn.innerHTML = PAUSE_ICON;
+
+        const utterance = new SpeechSynthesisUtterance(transText);
+        const myLang = document.getElementById('driver-lang').value;
+        utterance.lang = myLang === 'Hindi' ? 'hi-IN'
+          : myLang === 'Marathi' ? 'mr-IN' : 'en-IN';
+        utterance.rate = 0.9;
+
+        // ✅ THE FIX: reset button when speech actually ends
+        utterance.onend = () => {
+          btn.innerHTML = PLAY_ICON;
+          activeSpeechBtn = null;
+        };
+        // ✅ Also reset on error — don't fall through to original audio
+        utterance.onerror = () => {
+          btn.innerHTML = PLAY_ICON;
+          activeSpeechBtn = null;
+          showToast('Could not play translated audio');
+        };
+
+        window.speechSynthesis.speak(utterance);
+        return; // ✅ Always return — never fall through to original audio
+      }
+
+      // SENDER or no translation: play original audio file
+      // If same audio is playing → pause/resume
+      if (currentAudio && activePlayBtn === btn) {
+        if (!currentAudio.paused) {
+          currentAudio.pause();
+          btn.innerHTML = PLAY_ICON;
+        } else {
+          currentAudio.play();
+          btn.innerHTML = PAUSE_ICON;
+        }
+        return;
+      }
+
+      // Different audio was playing → stop it first
+      stopAudio();
+
+      currentAudio = new Audio(url);
+      activePlayBtn = btn;
+      btn.innerHTML = PAUSE_ICON;
+
+      currentAudio.play().catch(() => {
+        btn.innerHTML = PLAY_ICON;
+        activePlayBtn = null;
+        currentAudio = null;
+        showToast('Playback failed');
+      });
+
+      // ✅ Correct variable name (was `btn` but used undefined `b` in original)
+      currentAudio.onended = () => {
+        btn.innerHTML = PLAY_ICON;
+        currentAudio = null;
+        activePlayBtn = null;
+      };
+    }
+
+    // Standalone speak (translation card button)
+    function speakText(text, btn) {
       if (!text) return;
-      window.speechSynthesis.cancel();
+      if (activeSpeechBtn === btn) { stopSpeech(); return; }
+      stopSpeech();
+
+      activeSpeechBtn = btn || null;
+
       const utterance = new SpeechSynthesisUtterance(text);
       const myLang = document.getElementById('driver-lang').value;
-      if (myLang === 'Hindi') utterance.lang = 'hi-IN';
-      else if (myLang === 'Marathi') utterance.lang = 'mr-IN';
-      else utterance.lang = 'en-IN';
+      utterance.lang = myLang === 'Hindi' ? 'hi-IN'
+        : myLang === 'Marathi' ? 'mr-IN' : 'en-IN';
       utterance.rate = 0.9;
+      utterance.onend = utterance.onerror = () => { activeSpeechBtn = null; };
       window.speechSynthesis.speak(utterance);
     }
 
-    // ── Send a text message ────────────────────────────────────
+    function stopSpeech() {
+      window.speechSynthesis.cancel();
+      if (activeSpeechBtn) { activeSpeechBtn.innerHTML = PLAY_ICON; activeSpeechBtn = null; }
+    }
+
+    function stopAudio() {
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.src = '';
+        currentAudio = null;
+      }
+      if (activePlayBtn) { activePlayBtn.innerHTML = PLAY_ICON; activePlayBtn = null; }
+    }
+
+    // ── Send text message ────────────────────────────────────────────────────
     async function sendMessage() {
       if (!activePassenger) return;
       const input = document.getElementById('msg-input');
@@ -387,32 +942,28 @@
       input.value = '';
       autoResize(input);
 
-      const msg = {
-        sender_id: DRIVER_ID,
-        sender_type: 'driver',
-        sender_name: DRIVER_NAME,
-        receiver_id: activePassenger.id,
-        message: text,
-        message_type: 'text'
-      };
-      const { data } = await _supabase.from('safarr_messages').insert(msg).select().single();
+      const { data } = await _supabase.from('safarr_messages').insert({
+        sender_id: DRIVER_ID, sender_type: 'driver', sender_name: DRIVER_NAME,
+        receiver_id: activePassenger.id, message: text, message_type: 'text'
+      }).select().single();
       if (data) { appendMessage(data); scrollBottom(); }
     }
 
-    // ── Voice recording ────────────────────────────────────────
+    // ── Voice recording ──────────────────────────────────────────────────────
     async function toggleRecording() {
       if (!isRecording) {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           mediaRecorder = new MediaRecorder(stream);
           recordingChunks = [];
+          recordingStart = Date.now();
           mediaRecorder.ondataavailable = e => recordingChunks.push(e.data);
           mediaRecorder.onstop = sendVoiceMessage;
           mediaRecorder.start();
           isRecording = true;
           document.getElementById('voice-btn').classList.add('recording');
           document.getElementById('rec-bar').style.display = 'flex';
-        } catch(e) { showToast('Mic access denied'); }
+        } catch (e) { showToast('Mic access denied'); }
       } else {
         mediaRecorder.stop();
         mediaRecorder.stream.getTracks().forEach(t => t.stop());
@@ -424,158 +975,121 @@
 
     async function sendVoiceMessage() {
       if (!activePassenger || !recordingChunks.length) return;
+
+      // Calculate real duration
+      const durationSec = Math.round((Date.now() - recordingStart) / 1000);
+      const durLabel = `0:${String(durationSec).padStart(2, '0')}`;
       const blob = new Blob(recordingChunks, { type: 'audio/webm' });
 
-      // 1. Get Passenger's Latest Language
       await fetchPassengerLang(activePassenger.id);
 
-      // 2. Get AI Translation (Fail-safe)
       let translatedText = '';
+      const myLang = document.getElementById('driver-lang').value;
       try {
-        showToast(`AI Translating to ${passengerLang}...`);
-        const reader = new FileReader();
-        reader.readAsDataURL(blob);
-        const base64 = await new Promise((resolve, reject) => {
-          reader.onloadend = () => resolve(reader.result.split(',')[1]);
-          reader.onerror = reject;
-        });
-
-        const myLang = document.getElementById('driver-lang').value;
+        showToast(`Translating to ${passengerLang}...`);
+        const base64 = await blobToBase64(blob);
         const aiRes = await fetch('/.netlify/functions/translate-voice', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            audio: base64, 
-            targetLang: passengerLang,
-            sourceLang: myLang
-          })
+          body: JSON.stringify({ audio: base64, targetLang: passengerLang, sourceLang: myLang })
         });
-        
         if (aiRes.ok) {
           const aiData = await aiRes.json();
           translatedText = aiData.translatedText || '';
         } else {
-          const errData = await aiRes.json().catch(() => ({}));
-          console.error('Netlify Function Error:', aiRes.status, errData);
-          alert(`AI Error (${passengerLang}): ` + (errData.message || 'Server Error ' + aiRes.status));
+          const err = await aiRes.json().catch(() => ({}));
+          console.error('AI error:', err);
+          showToast('Translation failed — sending without translation');
         }
-      } catch (e) { 
-        console.error('AI Processing Skip (Translation Failed):', e); 
-      }
+      } catch (e) { console.error('AI skip:', e); }
 
-      // 3. Upload to Storage
       try {
         const path = `voice/driver_${Date.now()}.webm`;
-        const { error: upErr } = await _supabase.storage.from('safarr-storage').upload(path, blob);
+        const { error: upErr } = await _supabase.storage
+          .from('safarr-storage').upload(path, blob);
         if (upErr) throw upErr;
-        
-        const { data: urlData } = _supabase.storage.from('safarr-storage').getPublicUrl(path);
+
+        const { data: urlData } = _supabase.storage
+          .from('safarr-storage').getPublicUrl(path);
+
         const msg = {
           sender_id: DRIVER_ID, sender_type: 'driver', sender_name: DRIVER_NAME,
           receiver_id: activePassenger.id, message: '🎤 Voice message',
-          message_type: 'voice', voice_url: urlData.publicUrl, voice_duration: '0:05',
-          translated_text: translatedText || null // Ensure null if empty
+          message_type: 'voice', voice_url: urlData.publicUrl,
+          voice_duration: durLabel,
+          translated_text: translatedText || null,
+          source_lang: myLang
         };
 
-        // 3. Save to DB (Fail-safe)
-        const { data, error: insErr } = await _supabase.from('safarr_messages').insert(msg).select().single();
+        const { data, error: insErr } = await _supabase
+          .from('safarr_messages').insert(msg).select().single();
+
         if (insErr) {
-          console.warn('First insert failed, retrying without translated_text:', insErr.message);
-          delete msg.translated_text;
-          const { data: d2, error: insErr2 } = await _supabase.from('safarr_messages').insert(msg).select().single();
-          if (insErr2) throw insErr2;
+          // Fallback: retry without optional columns
+          console.warn('Insert retry without translated_text:', insErr.message);
+          delete msg.translated_text; delete msg.source_lang;
+          const { data: d2, error: e2 } = await _supabase
+            .from('safarr_messages').insert(msg).select().single();
+          if (e2) throw e2;
           if (d2) { appendMessage(d2); scrollBottom(); }
-        } else if (data) { 
-          appendMessage(data); 
-          scrollBottom(); 
+        } else if (data) {
+          appendMessage(data); scrollBottom();
         }
       } catch (e) {
-        console.error('Critical Upload Error:', e);
+        console.error('Upload error:', e);
         showToast('Message failed to send');
       }
     }
 
-    let currentAudio = null;
-    let activePlayBtn = null;
-
-    function playVoice(u, b, transText) {
-      const isSent = b.closest('.msg-row').classList.contains('sent');
-      const playIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
-      const pauseIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
-
-      // RECEIVER LOGIC: AI Voice with Original Fallback
-      if (activePassenger && !isSent && transText) {
-        try {
-          speakText(transText);
-          b.innerHTML = pauseIcon;
-          setTimeout(() => { b.innerHTML = playIcon; }, 4000);
-          
-          if (activePlayBtn === b) { 
-             window.speechSynthesis.cancel();
-          } else {
-             activePlayBtn = b;
-             return; 
-          }
-        } catch (e) { console.warn('AI Speech failed, falling back to original'); }
-      }
-
-      if (currentAudio && activePlayBtn) {
-        if (currentAudio.src === u) {
-          if (!currentAudio.paused) {
-            currentAudio.pause();
-            b.innerHTML = playIcon;
-            return;
-          } else {
-            currentAudio.play();
-            b.innerHTML = pauseIcon;
-            return;
-          }
-        } else {
-          currentAudio.pause();
-          activePlayBtn.innerHTML = playIcon;
-        }
-      }
-
-      currentAudio = new Audio(u);
-      activePlayBtn = b;
-      currentAudio.play().catch(e => {
-        console.error('Audio playback failed:', e);
-        showToast('Playback failed');
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function blobToBase64(blob) {
+      return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.readAsDataURL(blob);
+        r.onloadend = () => resolve(r.result.split(',')[1]);
+        r.onerror = reject;
       });
-      b.innerHTML = pauseIcon;
-
-      currentAudio.onended = () => {
-        btn.innerHTML = playIcon;
-        currentAudio = null;
-        activePlayBtn = null;
-      };
     }
 
     function handleKey(e) {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
     }
-    function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 100) + 'px'; }
-    function scrollBottom() { const f = document.getElementById('messages-feed'); f.scrollTop = f.scrollHeight; }
-    function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function autoResize(el) {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+    }
+    function scrollBottom() {
+      const f = document.getElementById('messages-feed');
+      f.scrollTop = f.scrollHeight;
+    }
+    function escHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
     function timeFmt(iso) {
-      const d = new Date(iso);
-      const now = new Date();
-      if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+      const d = new Date(iso), now = new Date();
+      if (d.toDateString() === now.toDateString())
+        return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
       return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
     }
     function showToast(m) {
-      let t = document.getElementById('_t');
-      if (!t) { t = document.createElement('div'); t.id = '_t'; t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#0a1628;color:#fff;padding:12px 24px;border-radius:50px;font-size:.9rem;z-index:99999;transition:opacity .3s;pointer-events:none;font-weight:600'; document.body.appendChild(t); }
+      let t = document.getElementById('_toast');
+      if (!t) {
+        t = document.createElement('div'); t.id = '_toast';
+        t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#0a1628;color:#fff;padding:12px 24px;border-radius:50px;font-size:.9rem;z-index:99999;transition:opacity .3s;pointer-events:none;font-weight:600;white-space:nowrap';
+        document.body.appendChild(t);
+      }
       t.textContent = m; t.style.opacity = '1';
-      setTimeout(() => t.style.opacity = '0', 3000);
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => t.style.opacity = '0', 3000);
     }
 
-    // Back button
-    window.history.pushState({page:1}, '', '');
+    window.history.pushState({ page: 1 }, '', '');
     window.onpopstate = () => {
-      if (document.getElementById('chat-panel').classList.contains('open')) { closeChatPanel(); history.pushState({page:1},'',''); }
-      else window.location.href = 'index.html';
+      if (document.getElementById('chat-panel').classList.contains('open')) {
+        closeChatPanel(); history.pushState({ page: 1 }, '', '');
+      } else window.location.href = 'index.html';
     };
   </script>
 </body>
+
 </html>
