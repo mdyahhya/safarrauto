@@ -17,16 +17,23 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
-    if (url.hostname.includes('supabase.co') || url.hostname.includes('api.')) return;
+    const isSameOrigin = url.origin === self.location.origin;
 
+    // Skip: Supabase API/storage, external APIs — let them pass through natively
+    if (!isSameOrigin) {
+        // Do NOT call event.respondWith() for cross-origin requests
+        // Adding custom headers to cross-origin fetches breaks CORS preflight
+        return;
+    }
+
+    // Same-origin requests: serve fresh, no cache
     event.respondWith(
-        fetch(event.request, {
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-        }).catch(() => {
+        fetch(event.request, { cache: 'no-store' }).catch(() => {
             if (event.request.mode === 'navigate') {
-                return new Response(`<html><body style="font-family:sans-serif; text-align:center; padding:100px;"><h1>🛺 Safarr Driver</h1><p>You're offline. Check your connection.</p><button onclick="location.reload()">Retry</button></body></html>`, { headers: { 'Content-Type': 'text/html' } });
+                return new Response(`<html><body style="font-family:sans-serif;text-align:center;padding:100px;"><h1>🛺 Safarr Driver</h1><p>You're offline. Check your connection.</p><button onclick="location.reload()">Retry</button></body></html>`, { headers: { 'Content-Type': 'text/html' } });
             }
+            // Always return a valid Response to avoid TypeError
+            return new Response('', { status: 503, statusText: 'Service Unavailable' });
         })
     );
 });
