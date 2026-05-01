@@ -614,16 +614,31 @@
       const voices = window.speechSynthesis.getVoices();
       if (!voices.length) return null;
       
-      const target = langCode.toLowerCase();
+      const target = langCode.toLowerCase().replace('_', '-');
       const targetShort = target.split('-')[0];
 
-      // 1. Exact match (e.g. 'hi-IN')
-      let v = voices.find(v => v.lang.toLowerCase() === target);
+      // 1. Exact match (e.g. 'hi-in')
+      let v = voices.find(v => v.lang.toLowerCase().replace('_', '-') === target);
+      
       // 2. Language prefix match (e.g. 'hi')
       if (!v) v = voices.find(v => v.lang.toLowerCase().startsWith(targetShort));
-      // 3. Name match (some browsers have 'Hindi' in the voice name)
-      if (!v) v = voices.find(v => v.name.toLowerCase().includes(targetShort));
       
+      // 3. Name-based search (e.g. "Google Hindi" or "Marathi")
+      if (!v) {
+        const fullNames = { 'hi': 'hindi', 'mr': 'marathi', 'en': 'english' };
+        const searchName = fullNames[targetShort];
+        v = voices.find(v => v.name.toLowerCase().includes(searchName));
+      }
+      
+      // 4. Case-insensitive name match for the short code (e.g. 'HI')
+      if (!v) v = voices.find(v => v.name.toUpperCase().includes(targetShort.toUpperCase()));
+
+      // 5. Script-aware fallback: If Marathi is missing, try Hindi (Devanagari script)
+      if (!v && targetShort === 'mr') {
+        console.log('Marathi voice missing, falling back to Hindi for phonetics...');
+        v = voices.find(v => v.lang.toLowerCase().startsWith('hi') || v.name.toLowerCase().includes('hindi'));
+      }
+
       return v || null;
     }
 
