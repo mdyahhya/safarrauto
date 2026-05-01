@@ -3765,7 +3765,7 @@
     </div>
     <!-- AI Speaking Agent -->
     <div class="ai-agent-container" id="ai-agent-ui">
-        <video class="ai-agent-video" id="ai-video" loop muted playsinline>
+        <video class="ai-agent-video" id="ai-video" loop muted playsinline autoplay>
             <source src="ai-agent.mp4" type="video/mp4">
         </video>
     </div>
@@ -3812,7 +3812,6 @@
                 this.video = document.getElementById('ai-video');
                 if (shouldSpeak) {
                     this.show();
-                    this.video.play().catch(() => {});
                     // Speak the language-selection prompt
                     setTimeout(() => this.speak('lang'), 800);
                 }
@@ -3820,6 +3819,7 @@
 
             show() {
                 document.getElementById('ai-agent-ui').classList.add('visible');
+                if (this.video) this.video.play().catch(() => {});
             },
 
             hide() {
