@@ -609,6 +609,17 @@
       window.speechSynthesis.onvoiceschanged = () => { _voicesReady = true; cb(); };
     }
 
+    // Explicitly find the best installed voice for a given BCP-47 lang code
+    function getBestVoice(langCode) {
+      const voices = window.speechSynthesis.getVoices();
+      // 1. Exact match (e.g. 'hi-IN')
+      let v = voices.find(v => v.lang === langCode);
+      // 2. Language prefix match (e.g. 'hi')
+      if (!v) v = voices.find(v => v.lang.toLowerCase().startsWith(langCode.split('-')[0]));
+      // 3. Any voice as last resort
+      return v || null;
+    }
+
     // ── Init ─────────────────────────────────────────────────────────────────
     window.onload = async () => {
       // Always fetch latest language from DB
@@ -855,23 +866,27 @@
 
         const utterance = new SpeechSynthesisUtterance(transText);
         const myLang = document.getElementById('driver-lang').value;
-        utterance.lang = myLang === 'Hindi' ? 'hi-IN'
-          : myLang === 'Marathi' ? 'mr-IN' : 'en-IN';
+        const langCode = myLang === 'Hindi' ? 'hi-IN' : myLang === 'Marathi' ? 'mr-IN' : 'en-IN';
+        utterance.lang = langCode;
         utterance.rate = 0.9;
 
-        // ✅ THE FIX: reset button when speech actually ends
+        // Always set handlers BEFORE speak()
         utterance.onend = () => {
           btn.innerHTML = PLAY_ICON;
           activeSpeechBtn = null;
         };
-        // ✅ Also reset on error — don't fall through to original audio
         utterance.onerror = () => {
           btn.innerHTML = PLAY_ICON;
           activeSpeechBtn = null;
           showToast('Could not play translated audio');
         };
 
-        ensureVoices(() => window.speechSynthesis.speak(utterance));
+        // Explicitly pick the correct installed voice (fixes Hindi/Marathi on Desktop)
+        ensureVoices(() => {
+          const voice = getBestVoice(langCode);
+          if (voice) utterance.voice = voice;
+          window.speechSynthesis.speak(utterance);
+        });
         return;
 
       }
