@@ -2731,8 +2731,9 @@
                 APP.lang = lang;
                 applyLang();
                 showScreen('screen-auth');
-                // No AI Agent on Auth screen by default, but it's initialized if needed
                 AI_AGENT.init(false); 
+                AI_AGENT.show();
+                setTimeout(() => AI_AGENT.speak('auth'), 800);
             } else {
                 showScreen('screen-lang');
                 AI_AGENT.init(true); // init and show for language selection
@@ -2877,6 +2878,7 @@
                 showScreen('screen-auth');
                 applyLang();
                 applyOnboardingLang();
+                AI_AGENT.speak('auth'); // Speak on auth screen
             }, 350);
         }
 
@@ -3791,6 +3793,11 @@
                     English: "Now enter your auto details. Please enter your vehicle number. Then enter the make or brand of your auto.",
                     Hindi:   "अब अपने ऑटो की जानकारी दें। गाड़ी का नंबर लिखें। फिर ऑटो का ब्रांड या कंपनी का नाम लिखें।",
                     Marathi: "आता तुमच्या ऑटोची माहिती द्या. वाहन नंबर लिहा. मग ऑटोचा ब्रँड किंवा कंपनीचे नाव लिहा."
+                },
+                'auth': {
+                    English: "Please sign in to your driver portal, or create a new profile if you are a new partner.",
+                    Hindi:   "कृपया अपने ड्राइवर पोर्टल में साइन इन करें, या यदि आप नए पार्टनर हैं तो एक नई प्रोफ़ाइल बनाएं।",
+                    Marathi: "कृपया तुमच्या ड्रायव्हर पोर्टलमध्ये साइन इन करा, किंवा तुम्ही नवीन पार्टनर असल्यास नवीन प्रोफाइल तयार करा."
                 }
             },
 
@@ -3887,13 +3894,6 @@
                 }
             }
         };
-
-        // Stop speaking the moment the user taps any input
-        document.addEventListener('focusin', (e) => {
-            if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) {
-                AI_AGENT.stopSpeech();
-            }
-        });
 
         // Voices load async — re-trigger init speech if needed
         window.speechSynthesis.onvoiceschanged = () => {};
