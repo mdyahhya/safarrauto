@@ -612,11 +612,18 @@
     // Explicitly find the best installed voice for a given BCP-47 lang code
     function getBestVoice(langCode) {
       const voices = window.speechSynthesis.getVoices();
+      if (!voices.length) return null;
+      
+      const target = langCode.toLowerCase();
+      const targetShort = target.split('-')[0];
+
       // 1. Exact match (e.g. 'hi-IN')
-      let v = voices.find(v => v.lang === langCode);
+      let v = voices.find(v => v.lang.toLowerCase() === target);
       // 2. Language prefix match (e.g. 'hi')
-      if (!v) v = voices.find(v => v.lang.toLowerCase().startsWith(langCode.split('-')[0]));
-      // 3. Any voice as last resort
+      if (!v) v = voices.find(v => v.lang.toLowerCase().startsWith(targetShort));
+      // 3. Name match (some browsers have 'Hindi' in the voice name)
+      if (!v) v = voices.find(v => v.name.toLowerCase().includes(targetShort));
+      
       return v || null;
     }
 
@@ -882,9 +889,15 @@
         };
 
         // Explicitly pick the correct installed voice (fixes Hindi/Marathi on Desktop)
+        console.log('Speaking translated text:', langCode, transText);
         ensureVoices(() => {
           const voice = getBestVoice(langCode);
-          if (voice) utterance.voice = voice;
+          if (voice) {
+            console.log('Using voice:', voice.name);
+            utterance.voice = voice;
+          } else {
+            console.warn('No specific voice found for', langCode, '- using default');
+          }
           window.speechSynthesis.speak(utterance);
         });
         return;
@@ -936,15 +949,28 @@
       activeSpeechBtn = btn || null;
 
       const utterance = new SpeechSynthesisUtterance(text);
-      // Driver file → use 'driver-lang' | Passenger file → use 'my-lang'
       const myLang = document.getElementById('driver-lang')?.value
         || document.getElementById('my-lang')?.value
         || 'English';
-      utterance.lang = myLang === 'Hindi' ? 'hi-IN' : myLang === 'Marathi' ? 'mr-IN' : 'en-IN';
+      const langCode = myLang === 'Hindi' ? 'hi-IN' : myLang === 'Marathi' ? 'mr-IN' : 'en-IN';
+      utterance.lang = langCode;
       utterance.rate = 0.9;
-      utterance.onend = utterance.onerror = () => { activeSpeechBtn = null; };
+      utterance.onend = utterance.onerror = () => { 
+        if (activeSpeechBtn === btn) btn.innerHTML = `
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+          </svg>`;
+        activeSpeechBtn = null; 
+      };
 
-      ensureVoices(() => window.speechSynthesis.speak(utterance));
+      if (btn) btn.innerHTML = PAUSE_ICON;
+
+      ensureVoices(() => {
+        const voice = getBestVoice(langCode);
+        if (voice) utterance.voice = voice;
+        window.speechSynthesis.speak(utterance);
+      });
     }
 
     function stopSpeech() {
