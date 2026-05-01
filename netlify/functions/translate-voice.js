@@ -21,17 +21,26 @@ exports.handler = async (event) => {
       };
     }
 
-    // ── STEP 1: Whisper STT with source-language hint ──────────────────────
+    // ── STEP 1: Whisper STT ──────────────────────────────────────────────────
     const audioBuffer = Buffer.from(audio, 'base64');
     const form = new FormData();
     form.append('file', audioBuffer, { filename: 'speech.webm', contentType: 'audio/webm' });
-    form.append('model', 'whisper-large-v3-turbo');
+    form.append('model', 'whisper-large-v3');
     form.append('response_format', 'json');
 
-    // Hint Whisper with confirmed source language — prevents mis-detection
+    // Source language hint — prevents Whisper from guessing
     if (sourceLang === 'Marathi')      form.append('language', 'mr');
     else if (sourceLang === 'Hindi')   form.append('language', 'hi');
     else if (sourceLang === 'English') form.append('language', 'en');
+
+    // Vocabulary primer — reduces mis-transcription for HI/MR
+    if (sourceLang === 'Marathi') {
+      form.append('prompt', 'हे संभाषण मराठीत आहे. सामान्य मराठी शब्द: जायचे, येणार, किती, कुठे, थांबा, पैसे, भाडे, सोडा, चला, आहे, नाही, सांगा, करा, द्या, घ्या, Nashik, station, mall, auto.');
+    } else if (sourceLang === 'Hindi') {
+      form.append('prompt', 'यह बातचीत हिंदी में है। सामान्य शब्द: जाना, आना, कितना, कहाँ, रुको, पैसे, भाड़ा, छोड़ो, चलो, है, नहीं, बताओ, करो, दो, लो, Nashik, station, mall, auto.');
+    } else {
+      form.append('prompt', 'This is a conversation between a driver and passenger in India. Common words: station, mall, auto, fare, stop, go, wait, how much, where, Nashik.');
+    }
 
     const whisperRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
@@ -49,78 +58,32 @@ exports.handler = async (event) => {
       };
     }
 
-    // ── STEP 2: Source-aware system prompt with few-shot examples ──────────
+    // ── STEP 2: Build system prompt ──────────────────────────────────────────
     const langLabel = {
       'English': 'English',
-      'Hindi':   'Hindi (Hindustani, Devanagari script)',
+      'Hindi':   'Hindi (Devanagari script)',
       'Marathi': 'Marathi (Pune/Mumbai spoken dialect, Devanagari script)'
     };
 
     const srcLabel = langLabel[sourceLang] || sourceLang || 'unknown';
     const tgtLabel = langLabel[targetLang] || targetLang;
 
-    const fewShotExamples = `
-REFERENCE EXAMPLES — match this style exactly:
+    const systemPrompt = `You are a professional translator for Safarr, an Indian auto-rickshaw app used in Maharashtra.
 
-[English → Hindi]
-"Where do you want to go?" → "आप कहाँ जाना चाहते हैं?"
-"The traffic is bad today." → "आज ट्रैफिक बहुत ज़्यादा है।"
-"I will be there in 5 minutes." → "मैं 5 मिनट में पहुँच जाऊँगा।"
-"Please sit, I will start now." → "बैठिए, मैं अभी चलता हूँ।"
-
-[Hindi → English]
-"मुझे स्टेशन जाना है।" → "I need to go to the station."
-"कितना टाइम लगेगा?" → "How long will it take?"
-"भाड़ा कितना होगा?" → "How much will the fare be?"
-"आप ठीक हैं?" → "Are you okay?"
-
-[English → Marathi]
-"Where do you want to go?" → "तुम्हाला कुठे जायचे आहे?"
-"We will reach in 10 minutes." → "आपण दहा मिनिटांत पोहोचू."
-"Please wait outside." → "कृपया बाहेर थांबा."
-"The route has traffic." → "रस्त्यावर जास्त गर्दी आहे."
-
-[Marathi → English]
-"मला पुण्याला जायचं आहे." → "I want to go to Pune."
-"किती वेळ लागेल?" → "How long will it take?"
-"मला उशीर होतोय." → "I am getting late."
-"भाडं किती आहे?" → "What is the fare?"
-
-[Hindi → Marathi]
-"आप कहाँ जाना चाहते हैं?" → "तुम्हाला कुठे जायचे आहे?"
-"मुझे देर हो रही है।" → "मला उशीर होतोय."
-"बैठिए, चलते हैं।" → "बसा, निघूया."
-"कितना किलोमीटर है?" → "किती किलोमीटर आहे?"
-
-[Marathi → Hindi]
-"तुम्हाला कुठे जायचे आहे?" → "आप कहाँ जाना चाहते हैं?"
-"मला उशीर होतोय." → "मुझे देर हो रही है।"
-"गाडी थांबवा इथेच." → "गाड़ी यहीं रोकिए।"
-"किती पैसे होतील?" → "कितने पैसे होंगे?"`;
-
-    const systemPrompt = `You are a professional multilingual translator built into Safarr, an Indian auto-rickshaw ride-hailing app used in Maharashtra.
-
-SOURCE LANGUAGE (CONFIRMED — do not re-detect): ${srcLabel}
+SOURCE LANGUAGE (CONFIRMED, DO NOT CHANGE): ${srcLabel}
 TARGET LANGUAGE: ${tgtLabel}
 
-${fewShotExamples}
-
 RULES:
-1. SOURCE IS LOCKED: The input is always in ${srcLabel}. Never guess or change this. Even if the text looks ambiguous, treat it as ${srcLabel}.
-2. MARATHI DIALECT: Use everyday spoken Marathi of Pune and Mumbai. 
-   - Use "तुम्ही / तुम्हाला" for neutral and formal address.
-   - Use "तू / तुला" ONLY if the original speaker explicitly used "Tu".
-   - Never use Sanskrit-heavy or textbook Marathi words. Prefer: "जायचे" over "जाणे", "किती" over "कति".
-3. HINDI FORMALITY:
-   - Use "आप / आपको / आपसे" for formal or neutral tone.
-   - Use "तुम / तुम्हें" only if the original used "Tum".
-   - Never use "Tu/Tera" unless the original was extremely casual between friends.
-4. ENGLISH: Use simple, natural Indian-English. Short sentences. Prefer "I need to go" over "I wish to proceed".
-5. TONE PRESERVATION: Match the speaker's emotional register — polite, urgent, casual, frustrated — exactly.
-6. NO ADDITIONS: Do not add explanations, greetings, or any words not in the original.
-7. OUTPUT FORMAT: Return ONLY the translated string. No quotes, no labels, no commentary.`;
+1. SOURCE IS LOCKED. The input text is always ${srcLabel}. Never re-detect or guess the language. Treat all input as ${srcLabel} regardless of how it looks.
+2. MIXED LANGUAGE. If the input contains English words or Indian place names mixed in (e.g. "station", "mall", "Nashik", "auto"), keep those words in English as-is. Only translate the rest into ${tgtLabel}.
+3. MARATHI DIALECT. When translating into Marathi, use everyday spoken Marathi of Pune and Mumbai. Use "तुम्ही / तुम्हाला" for neutral or formal. Use "तू / तुला" only if the original explicitly used "Tu". Never use Sanskrit-heavy or textbook Marathi.
+4. HINDI FORMALITY. Use "आप / आपको" for neutral or formal tone. Use "तुम / तुम्हें" only if the original used "Tum". Never default to "Tu/Tera".
+5. ENGLISH. Use simple natural Indian-English. Short sentences. Avoid formal or bureaucratic phrasing.
+6. TONE. Match the speaker's tone exactly — polite, urgent, casual, or frustrated.
+7. NO ADDITIONS. Translate only what was said. No extra words, no explanations, no greetings.
+8. OUTPUT. Return ONLY the translated string. No quotes, no labels, no commentary.`;
 
-    // ── STEP 3: Translation via llama-3.3-70b-versatile ───────────────────
+    // ── STEP 3: Translation via llama-3.3-70b-versatile ─────────────────────
     const translationRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -131,9 +94,9 @@ RULES:
         model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user',   content: transcription }
+          { role: 'user',   content: `[Source: ${sourceLang}]\n${transcription}` }
         ],
-        temperature: 0.2,
+        temperature: 0.1,
         max_tokens: 512
       })
     });
