@@ -3566,6 +3566,7 @@
                 APP.driverData = null;
                 APP.lang = 'en';
                 showScreen('screen-lang');
+                AI_AGENT.init(true); // Restart AI Agent guidance
             }
         }
 
@@ -3836,6 +3837,7 @@
 
             speak(scriptKey) {
                 this.stopSpeech();
+                this.show(); // Ensure agent is visible when speaking
                 const text = (this.SCRIPTS[scriptKey] || {})[this.currentLang]
                            || this.SCRIPTS[scriptKey]['English'];
                 if (!text || !this.synth) return;
@@ -3876,6 +3878,7 @@
             },
 
             speakOnboarding(step) {
+                this.show(); // Ensure agent is visible
                 this.speak(step);
 
                 // Clear any previous timers
