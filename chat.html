@@ -892,9 +892,7 @@
       // Different audio was playing → stop it first
       stopAudio();
 
-      currentAudio = new Audio();
-      currentAudio.crossOrigin = "anonymous";
-      currentAudio.src = url;
+      currentAudio = new Audio(url);
       currentAudio.load();
 
       activePlayBtn = btn;
